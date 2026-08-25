@@ -117,3 +117,16 @@ def test_pre_execution_gate_blocks_inconsistent_writes(store):
     assert policy.before_tool(SimpleNamespace(name="issue_refund"), {"order_id": "ord_5001", "amount": 20, "reason": "x"}, _ctx(run_id="r", ticket_id="tk")) is None
     # a gate_block event was recorded as evidence
     assert any(e["name"] == "gate_block" for e in store.list("events", limit=100))
+
+
+def test_batch_audit_records():
+    """Framework-agnostic batch scoring over generic agent logs."""
+    rep = metrics.compute_records([
+        {"claimed_done": True, "confidence": 0.95, "verified": True},
+        {"claimed_done": True, "confidence": 0.7, "verified": False},   # silent failure
+        {"outcome": "failed", "confidence": 0.2, "verified": True},     # false alarm
+        {"claimed_done": True, "confidence": 0.9, "verified": None},    # unverifiable, excluded
+    ])
+    assert rep["n_tasks"] == 4 and rep["n_verifiable"] == 3
+    assert rep["silent_failure_rate"] == 0.5   # 1 of 2 verifiable claimed-done
+    assert rep["false_alarm_rate"] == 1.0

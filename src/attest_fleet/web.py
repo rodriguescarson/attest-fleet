@@ -66,6 +66,32 @@ async def create_ticket(request: Request, background: BackgroundTasks) -> dict:
     return {"accepted": True, "ticket_id": ticket.id}
 
 
+@app.post("/tickets/batch", status_code=202)
+async def create_tickets_batch(request: Request, background: BackgroundTasks) -> dict:
+    """Async batch trigger: enqueue many tickets at once; they process in the
+    background and stream onto the dashboard. Accepts {"tickets": [...]} or a bare list."""
+    payload = await request.json()
+    items = payload.get("tickets", payload) if isinstance(payload, dict) else payload
+    ids = []
+    for raw in (items or [])[:200]:
+        tk = Ticket.model_validate(raw)
+        background.add_task(run_ticket, tk)
+        ids.append(tk.id)
+    return {"accepted": len(ids), "ticket_ids": ids}
+
+
+@app.post("/audit")
+async def audit(request: Request) -> dict:
+    """Framework-agnostic batch audit. POST a list of agent-run logs — each
+    {claimed_done|outcome, confidence, verified} — and get the Attest report
+    (silent-failure rate, calibration, escalation) over the whole batch. No agents
+    are re-run: this is pure measurement, so it scales to large volumes of logs from
+    any agent stack (point OpenTelemetry GenAI spans or your own logs at it)."""
+    payload = await request.json()
+    records = payload.get("records", payload) if isinstance(payload, dict) else payload
+    return metrics.compute_records(records or [], config.TARGET_RESIDUAL_RISK)
+
+
 # ------------------------------------------------------------------ evidence API
 
 

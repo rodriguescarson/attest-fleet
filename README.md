@@ -1,5 +1,7 @@
 # Attest Fleet
 
+[![CI](https://github.com/rodriguescarson/attest-fleet/actions/workflows/ci.yml/badge.svg)](https://github.com/rodriguescarson/attest-fleet/actions/workflows/ci.yml)
+
 **A governed agent fleet whose every claim is independently verified.**
 Built for the All Things Agentic Hackathon (Google) — Fortified Enterprise Fleet.
 
@@ -55,6 +57,21 @@ curl -s localhost:8080/tickets?wait=1 -H 'content-type: application/json' -d '{
 
 Then open http://localhost:8080 for the operator dashboard (metrics, pending approvals,
 kill switch, run evidence).
+
+### Runs in the background, at volume
+
+`POST /tickets` returns immediately and processes asynchronously; `POST /tickets/batch`
+enqueues a whole workload of tickets that stream onto the dashboard as they finish. And
+`POST /audit` is framework-agnostic: point a list of *any* agent's run logs at it and get
+the silent-failure report back, no agents re-run, scaling to large volumes.
+
+```bash
+curl -s localhost:8080/audit -H 'content-type: application/json' -d '[
+  {"claimed_done": true,  "confidence": 0.95, "verified": true},
+  {"claimed_done": true,  "confidence": 0.70, "verified": false},
+  {"outcome": "failed",   "confidence": 0.20, "verified": true}
+]' | jq '{silent_failure_rate, escalation}'
+```
 
 ## Eval harness
 

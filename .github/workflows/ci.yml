@@ -1,0 +1,22 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.13"
+      - name: Sync dependencies
+        run: uv sync --frozen
+      - name: Tests (metrics, verifier, policy gate — no API keys)
+        run: uv run pytest -q
+      - name: Typecheck
+        run: uv run python -c "import compileall, sys; sys.exit(0 if compileall.compile_dir('src', quiet=1) else 1)"

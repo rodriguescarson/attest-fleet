@@ -73,8 +73,25 @@ def escalation_threshold(samples: list[Sample], target_risk: float) -> Optional[
     return {**best, "target_risk": target_risk}
 
 
+def compute_records(records: Iterable[dict], target_risk: float = 0.02) -> dict:
+    """Score a batch of generic agent-run logs (framework-agnostic). Each record:
+    {claimed_done|outcome, confidence, verified}. No agents re-run — pure measurement,
+    so it scales to tens of thousands of logs in one pass."""
+    samples = []
+    for r in records:
+        done = r.get("claimed_done")
+        if done is None:
+            done = r.get("outcome") == "done"
+        v = r.get("verified")
+        samples.append(Sample(bool(done), float(r.get("confidence", 0) or 0), v))
+    return _report(samples, target_risk)
+
+
 def compute(pairs: Iterable[tuple[Claim, Verification]], target_risk: float = 0.02) -> dict:
-    samples = to_samples(pairs)
+    return _report(to_samples(pairs), target_risk)
+
+
+def _report(samples: list[Sample], target_risk: float = 0.02) -> dict:
     n = len(samples)
     verifiable = [s for s in samples if s.verified is not None]
     claimed_done = [s for s in verifiable if s.claimed_done]
