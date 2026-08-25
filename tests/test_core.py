@@ -101,3 +101,19 @@ def test_policy_small_refund_passes_and_kill_switch_blocks(store):
     res = policy.before_tool(tool, {"order_id": "ord_5001", "amount": 10, "reason": "x"}, _ctx(run_id="r", ticket_id="tk"))
     assert res["status"] == "blocked"
     assert policy.before_tool(SimpleNamespace(name="get_order"), {"order_id": "ord_5001"}, _ctx(run_id="r", ticket_id="tk")) is None
+
+
+def test_pre_execution_gate_blocks_inconsistent_writes(store):
+    """Reddy et al. 2025: deterministic pre-execution gate prevents state-inconsistent writes."""
+    ctx = _ctx(run_id="r", ticket_id="tk", task_id="t")
+    # refund exceeding the refundable balance is blocked BEFORE it runs
+    res = policy.before_tool(SimpleNamespace(name="issue_refund"), {"order_id": "ord_5001", "amount": 999, "reason": "x"}, ctx)
+    assert res["status"] == "blocked" and "exceeds the refundable balance" in res["reason"]
+    # refund on a non-existent order is blocked
+    assert policy.before_tool(SimpleNamespace(name="issue_refund"), {"order_id": "nope", "amount": 5}, _ctx(run_id="r", ticket_id="tk"))["status"] == "blocked"
+    # unlock of a non-existent customer is blocked
+    assert policy.before_tool(SimpleNamespace(name="unlock_account"), {"customer_id": "nope"}, _ctx(run_id="r", ticket_id="tk"))["status"] == "blocked"
+    # a valid, in-balance refund passes the gate
+    assert policy.before_tool(SimpleNamespace(name="issue_refund"), {"order_id": "ord_5001", "amount": 20, "reason": "x"}, _ctx(run_id="r", ticket_id="tk")) is None
+    # a gate_block event was recorded as evidence
+    assert any(e["name"] == "gate_block" for e in store.list("events", limit=100))

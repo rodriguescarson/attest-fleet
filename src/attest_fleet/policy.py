@@ -1,6 +1,6 @@
 """The governance layer: every tool call passes through here.
 
-before_tool: kill switch, high-risk approval gate, run-id injection.
+before_tool: kill switch, deterministic pre-execution state gate, high-risk approval gate.
 after_tool:  execution-evidence capture (args, result, latency) to the store.
 
 Both are ADK callbacks attached to every worker agent."""
@@ -16,6 +16,36 @@ from . import config
 from .domain import Approval, Event
 from .store import get_store
 from .tools import MUTATING
+
+
+def _state_gate(tool_name: str, args: dict[str, Any], store) -> Optional[str]:
+    """Deterministic pre-execution gate (Reddy et al. 2025, arXiv 2607.07405): validate a
+    mutating call against current state BEFORE the write, so a policy-inconsistent action is
+    prevented rather than detected after the fact. Returns a reason to block, or None to allow."""
+    if tool_name == "issue_refund":
+        order = store.get("orders", args.get("order_id", ""))
+        if order is None:
+            return f"order {args.get('order_id')!r} does not exist"
+        try:
+            amount = float(args.get("amount", 0))
+        except (TypeError, ValueError):
+            return "refund amount is not a number"
+        remaining = round(float(order["total"]) - float(order.get("refunded", 0)), 2)
+        if amount <= 0:
+            return "refund amount must be positive"
+        if amount > remaining + 1e-9:
+            return f"refund {amount:.2f} exceeds the refundable balance {remaining:.2f}"
+    elif tool_name in ("update_address", "unlock_account", "delete_account", "record_note"):
+        cid = args.get("customer_id", "")
+        if store.get("customers", cid) is None:
+            return f"customer {cid!r} does not exist"
+        if tool_name == "update_address" and not str(args.get("new_address", "")).strip():
+            return "new address is empty"
+    elif tool_name == "cancel_subscription":
+        sid = args.get("subscription_id", "")
+        if sid and store.get("subscriptions", sid) is None:
+            return f"subscription {sid!r} does not exist"
+    return None
 
 
 def _is_high_risk(tool_name: str, args: dict[str, Any]) -> Optional[str]:
@@ -62,6 +92,15 @@ def before_tool(tool, args: dict[str, Any], tool_context) -> Optional[dict]:
                      args_json=json.dumps({"tool": tool.name, "args": args}, default=str))
         return {"status": "blocked", "reason": "fleet kill switch is engaged; no mutating actions are allowed",
                 "instruction": "Report outcome='blocked'. Do not claim the task is done."}
+
+    # Deterministic pre-execution gate: block a state-inconsistent write before it happens.
+    if tool.name in MUTATING:
+        gate = _state_gate(tool.name, args, store)
+        if gate:
+            record_event(run_id=run_id, task_id=task_id, agent=agent, kind="policy", name="gate_block",
+                         args_json=json.dumps({"tool": tool.name, "args": args, "reason": gate}, default=str))
+            return {"status": "blocked", "reason": gate,
+                    "instruction": "This action is inconsistent with the current system state and was blocked before it ran. Report outcome='failed' and quote this reason. Do not claim the task is done."}
 
     reason = _is_high_risk(tool.name, args)
     if reason:

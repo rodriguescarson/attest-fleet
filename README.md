@@ -104,7 +104,7 @@ deploys from source. Point a Pub/Sub push subscription or any webhook at `POST /
 | 4 Tool calling | `tools.py` (FunctionTools over Firestore) |
 | 5 Result verification | `verifier.py` — post-conditions on the system of record |
 | 6 Evidence capture | `policy.after_tool` + `fleet._log` → `events`, `runs` |
-| 7 Approval / rollback | `policy.before_tool` — kill switch, approval gate; `/approvals/{id}/approve/rerun` |
+| 7 Approval / rollback | `policy.before_tool` — **deterministic pre-execution gate** (block state-inconsistent writes), kill switch, approval gate; `/approvals/{id}/approve/rerun` |
 | 8 Experience capture | `experience.py` → `playbook` → worker instruction |
 
 ## Agent identity list
@@ -116,12 +116,32 @@ Served live at `/fleet/identities`. See `agents.py` docstring.
 | Failure | Detected by | Fallback |
 |---|---|---|
 | Tool reports success, state is `pending_gateway` / `cancel_requested` / draft write | verifier post-condition | run marked `silent_failure`; lesson added to playbook |
+| State-inconsistent write (refund > balance, act on a non-existent entity) | **pre-execution gate** | blocked before the write; worker reports `failed` |
 | Ambiguous customer (two "Priya Sharma") | controller must disambiguate; verifier + eval ground truth | task type `other`, no mutation |
 | High-risk action (refund > limit, deletion) | policy gate before the tool runs | approval doc, worker reports `blocked`, operator approves + reruns |
 | Worker claims `done` on a `pending_approval` result | verifier | silent failure recorded, lesson captured |
 | Transient tool error (`IAM_TIMEOUT`) | tool result | worker reports `failed`; retry on rerun |
 | Model rate limit / malformed output | `run_agent` retries, schema validation | run `failed` with error, evidence retained |
 | Operator loses trust | kill switch | all mutating tools blocked fleet-wide |
+
+## Grounding in current research
+
+Attest Fleet's design choices are the same conclusions recent agent-reliability papers
+reached. See [docs/RESEARCH.md](docs/RESEARCH.md) for the mapping; in short:
+
+- **Independent state verification** beats self-report — false success drops from ~48% to
+  ~3% with a dual-control verifier, and cheap deterministic detectors beat LLM judges 4–8×
+  (Advani, [2606.09863](https://arxiv.org/abs/2606.09863)). Attest verifies against the
+  system of record, deterministic-first.
+- **Deterministic pre-execution gates** recover silent policy-violations (+12pp; Reddy et
+  al., [2607.07405](https://arxiv.org/abs/2607.07405)). Implemented in `policy.py`.
+- **Trajectory-level calibration** (ECE) is what agents need (Zhang et al.,
+  [2601.15778](https://arxiv.org/abs/2601.15778)); Attest reports Brier/ECE over runs.
+- **End-state correctness + injected faults** (Gupta, ReliabilityBench,
+  [2601.06112](https://arxiv.org/abs/2601.06112)); the eval harness injects tool faults.
+- **Cascaded selective escalation** with a coverage/risk guarantee (Kim et al., ICLR 2025,
+  [2407.18370](https://arxiv.org/abs/2407.18370)); the escalation threshold is that
+  operating point.
 
 ## Prior work (disclosure)
 
