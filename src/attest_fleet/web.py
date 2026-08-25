@@ -154,7 +154,7 @@ def playbook() -> list[dict]:
     return get_store().list("playbook", limit=100)
 
 
-@app.get("/healthz")
+@app.get("/health")
 def healthz() -> dict:
     return {"ok": True, "store": get_store().backend, "models": {"controller": config.CONTROLLER_MODEL, "worker": config.WORKER_MODEL}}
 
