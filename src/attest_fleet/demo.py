@@ -80,6 +80,16 @@ def seed_demo(store: BaseStore) -> None:
          Verification(task_id="t1", verified=True, method="postcondition", checks=[Check(name="refund_completed_amount", passed=True, detail="completed refunds 80.00, expected 80.00")], detail="ok"),
          [{"kind": "tool", "name": "issue_refund", "agent": "billing_agent", "result": '{"state":"completed"}', "ms": 79}, {"kind": "verify", "name": "verified", "result": '{"verified":true}'}], 51, gt=True)
 
+    # 7 — vision intake: customer attached a screenshot; the fleet reads it, then refunds
+    _run(store, "run_demo7", "Charged twice, see screenshot", "cus_1006", "verified",
+         Task(id="t1", type="refund", worker="billing_agent", customer_id="cus_1006", order_id="ord_5006", amount=49.0, instruction="Refund the duplicate 49 charge on ord_5006.", rationale="Screenshot shows a duplicate charge."),
+         {"task_id": "t1", "outcome": "done", "confidence": 0.96, "evidence": "issue_refund completed 49.00 on ord_5006; order.refunded=49.0.", "resolution": "Customer cus_1006; the attached screenshot named order ord_5006 and a duplicate 49.00 charge."},
+         Verification(task_id="t1", verified=True, method="postcondition", checks=[Check(name="refund_completed_amount", passed=True, detail="completed refunds 49.00, expected 49.00")], detail="ok"),
+         [{"kind": "model", "name": "vision_read", "agent": "vision_reader", "args": '{"saw":"Screenshot of a billing history showing two identical charges of $49.00 for order ord_5006 dated the same day."}', "ms": 640},
+          {"kind": "tool", "name": "issue_refund", "agent": "billing_agent", "result": '{"state":"completed"}', "ms": 83},
+          {"kind": "verify", "name": "verified", "result": '{"verified":true}'}], 57, gt=True)
+    r7=store.get("runs","run_demo7"); r7["vision"]="Screenshot of a billing history showing two identical charges of $49.00 for order ord_5006 dated the same day."; store.set("runs","run_demo7",r7)
+
     store.set("playbook", "address_draft", {"worker": "account_agent", "task_type": "address_change",
               "lesson": "After update_address, call get_customer and confirm the 'address' field equals the requested address before claiming done. A success message alone is not evidence.",
               "count": 1, "first_seen": f"{_TS}20:00Z", "last_seen": f"{_TS}20:00Z", "last_run": "run_demo2"})

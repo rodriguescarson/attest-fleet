@@ -24,6 +24,7 @@ AGENT_IDENTITIES = [
     {"name": "fleet_controller", "model": config.CONTROLLER_MODEL, "role": "Task decomposition and customer resolution", "tools": [t.__name__ for t in tools.READ_TOOLS], "mutates": False, "collaborates_with": ["billing_agent", "account_agent"]},
     {"name": "billing_agent", "model": config.WORKER_MODEL, "role": "Refunds and order actions", "tools": [t.__name__ for t in tools.BILLING_TOOLS], "mutates": True, "collaborates_with": ["fleet_controller"]},
     {"name": "account_agent", "model": config.WORKER_MODEL, "role": "Address, subscription, lock and deletion actions", "tools": [t.__name__ for t in tools.ACCOUNT_TOOLS], "mutates": True, "collaborates_with": ["fleet_controller"]},
+    {"name": "vision_reader", "model": config.VISION_MODEL, "role": "Reads an image attached to a ticket (screenshot, receipt, photo) into text before planning", "tools": [], "mutates": False, "collaborates_with": ["fleet_controller"]},
     {"name": "auditor", "model": config.AUDITOR_MODEL, "role": "LLM verification for tasks without a deterministic post-condition", "tools": [], "mutates": False, "collaborates_with": []},
 ]
 

@@ -99,10 +99,13 @@ async def run_agent(agent_name: str, prompt: str, state: dict[str, Any], schema:
     raise RuntimeError(f"{agent_name} failed after {retries + 1} attempts: {last_err}")
 
 
-def _ticket_prompt(ticket: Ticket) -> str:
-    return (f"TICKET {ticket.id} (source: {ticket.source})\n"
+def _ticket_prompt(ticket: Ticket, vision: Optional[str] = None) -> str:
+    base = (f"TICKET {ticket.id} (source: {ticket.source})\n"
             f"Customer reference: {ticket.customer_ref}\n"
             f"Subject: {ticket.subject}\n\n{ticket.body}")
+    if vision:
+        base += f"\n\nATTACHED IMAGE (read by the vision model): {vision}"
+    return base
 
 
 def _task_prompt(task: Task) -> str:
@@ -135,7 +138,18 @@ async def run_ticket(ticket: Ticket) -> RunRecord:
             run.status = "killed"
             run.error = "kill switch engaged"
             return run
-        plan = await run_agent("fleet_controller", _ticket_prompt(agent_ticket), {"run_id": run.id, "ticket_id": ticket.id}, Plan)
+        vision_desc: Optional[str] = None
+        if ticket.image_url:
+            from .vision import read_attachment
+            t0 = time.perf_counter()
+            try:
+                vision_desc = await read_attachment(ticket.image_url)
+                run.vision = vision_desc
+                _log(run.id, "model", "vision_read", agent="vision_reader", latency_ms=int((time.perf_counter() - t0) * 1000), saw=vision_desc)
+                store.set("runs", run.id, run.model_dump())
+            except Exception as e:  # noqa: BLE001 — a bad attachment must not sink the ticket
+                _log(run.id, "model", "vision_error", agent="vision_reader", error=str(e)[:300])
+        plan = await run_agent("fleet_controller", _ticket_prompt(agent_ticket, vision_desc), {"run_id": run.id, "ticket_id": ticket.id}, Plan)
         run.plan = plan
         store.set("runs", run.id, run.model_dump())
         pairs: list[tuple[Claim, Verification]] = []

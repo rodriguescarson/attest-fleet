@@ -74,7 +74,8 @@ Served live at `GET /fleet/identities`.
 | `fleet_controller` | gemini-3.5-flash-lite | Decompose ticket, resolve customer (read-only tools) | no | billing_agent, account_agent |
 | `billing_agent` | gemini-3.5-flash-lite | Refunds, order reads | yes (gated) | fleet_controller |
 | `account_agent` | gemini-3.5-flash-lite | Address, cancel, unlock, delete | yes (gated) | fleet_controller |
-| `auditor` | gemini-3.5-flash-lite | Verify tasks with no deterministic post-condition | no | — |
+| `vision_reader` | gemini-3.5-flash-lite | Read an image attached to a ticket (screenshot, receipt, photo) into text | no | fleet_controller |
+| `auditor` | **gemma-4-31b-it** | Verify tasks with no deterministic post-condition — a different model family, so it doesn't share the workers' blind spots | no | — |
 
 The controller model is env-configurable (`ATTEST_CONTROLLER_MODEL`); it moves to `gemini-3.5-flash`
 once demand-shed 503s clear. The failure-mode table is in the [README](../README.md#failure-mode-table).

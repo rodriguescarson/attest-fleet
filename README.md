@@ -29,9 +29,10 @@ trigger ──► fleet_controller ──► billing_agent / account_agent ─�
 
 | Requirement | Used |
 |---|---|
-| Gemini 3.5+ | `gemini-3.5-flash` (controller), `gemini-3.5-flash-lite` (workers, auditor) |
+| Gemini 3.5+ | `gemini-3.5-flash-lite` (controller + workers), Gemini vision reads ticket screenshots |
 | Google agent framework | Agent Development Kit (`google-adk` 2.7) — `LlmAgent`, tools, `output_schema`, tool callbacks |
 | Google Cloud infra | Cloud Run (service), Firestore (system of record + evidence store) |
+| Extra Google models (bonus) | **Gemma** (`gemma-4-31b-it`) as the independent auditor; **Gemini vision** for image intake — both motivated, not bolted on |
 
 ## Run locally (no cloud needed)
 
@@ -97,7 +98,7 @@ deploys from source. Point a Pub/Sub push subscription or any webhook at `POST /
 
 | Step | Where |
 |---|---|
-| 1 Task input (real trigger) | `POST /tickets` — webhook or Pub/Sub envelope, `web.py` |
+| 1 Task input (real trigger) | `POST /tickets` — webhook or Pub/Sub envelope; an attached image is read by **Gemini vision** first (`vision.py`) |
 | 2 Decomposition | `fleet_controller`, `agents.py` → `Plan` |
 | 3 Context passing | `fleet.py` passes each `Task` alone to its worker |
 | 4 Tool calling | `tools.py` (FunctionTools over Firestore) |

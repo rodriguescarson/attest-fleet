@@ -34,6 +34,7 @@ class Ticket(BaseModel):
     subject: str
     body: str
     created_at: str = Field(default_factory=now_iso)
+    image_url: Optional[str] = Field(default=None, description="Optional attachment (https or data: URL) the vision reader describes before planning.")
     # Ground truth for the eval harness only. Stripped before any agent sees the ticket.
     expected: Optional["Expectation"] = None
 
@@ -153,6 +154,7 @@ class RunRecord(BaseModel):
     started_at: str = Field(default_factory=now_iso)
     finished_at: Optional[str] = None
     error: Optional[str] = None
+    vision: Optional[str] = None  # what the vision reader saw in an attached image
     ground_truth: Optional[bool] = None  # eval harness: did the world end up as expected?
 
 
