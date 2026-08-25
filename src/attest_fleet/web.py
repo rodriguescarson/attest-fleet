@@ -10,6 +10,8 @@ import asyncio
 import base64
 import html
 import json
+import os
+from pathlib import Path
 from contextlib import asynccontextmanager
 from typing import Any, Optional
 
@@ -26,6 +28,9 @@ from .store import get_store, seed
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     seed(get_store())
+    if os.getenv("ATTEST_DEMO") == "1":
+        from .demo import seed_demo
+        seed_demo(get_store())
     yield
 
 
@@ -74,10 +79,25 @@ def _pairs(runs: list[dict]) -> list[tuple[Claim, Verification]]:
 
 
 @app.get("/runs")
-def list_runs(limit: int = 50) -> list[dict]:
-    runs = get_store().list("runs", limit=limit)
-    runs.sort(key=lambda r: r.get("started_at", ""), reverse=True)
-    return runs
+def list_runs(q: str = "", status: str = "", sort: str = "started", order: str = "desc", limit: int = 20, offset: int = 0) -> dict:
+    """Server-side search, filter, sort and pagination over runs."""
+    runs = get_store().list("runs", limit=10_000)
+    if status:
+        runs = [r for r in runs if r.get("status") == status]
+    if q:
+        ql = q.lower()
+        runs = [r for r in runs if ql in r.get("id", "").lower() or ql in r.get("ticket", {}).get("subject", "").lower() or ql in r.get("ticket", {}).get("customer_ref", "").lower()]
+    keyers = {
+        "started": lambda r: r.get("started_at", ""),
+        "subject": lambda r: r.get("ticket", {}).get("subject", "").lower(),
+        "status": lambda r: r.get("status", ""),
+        "tasks": lambda r: len(r.get("results", [])),
+    }
+    runs.sort(key=keyers.get(sort, keyers["started"]), reverse=(order != "asc"))
+    total = len(runs)
+    limit = max(1, min(limit, 100))
+    return {"items": runs[offset:offset + limit], "total": total, "limit": limit, "offset": offset,
+            "counts": {s: sum(1 for r in get_store().list("runs", limit=10_000) if r.get("status") == s) for s in ("verified", "silent_failure", "pending_approval", "failed", "killed", "running")}}
 
 
 @app.get("/runs/{run_id}")
@@ -156,7 +176,9 @@ def playbook() -> list[dict]:
 
 @app.get("/health")
 def healthz() -> dict:
-    return {"ok": True, "store": get_store().backend, "models": {"controller": config.CONTROLLER_MODEL, "worker": config.WORKER_MODEL}}
+    store = get_store()
+    return {"ok": True, "store": store.backend, "kill_switch": bool(store.get_setting("kill_switch", False)),
+            "models": {"controller": config.CONTROLLER_MODEL, "worker": config.WORKER_MODEL}}
 
 
 # ------------------------------------------------------------------ dashboard
@@ -166,60 +188,9 @@ def _fmt(v: Any) -> str:
     return "—" if v is None else (f"{v:.1%}" if isinstance(v, float) and v <= 1 else str(v))
 
 
-@app.get("/", response_class=HTMLResponse)
-def dashboard() -> str:
-    store = get_store()
-    m = get_metrics()
-    runs = list_runs(limit=25)
-    pending = list_approvals("pending")
-    kill_on = bool(store.get_setting("kill_switch", False))
-    e = html.escape
-    rows = "".join(
-        f"<tr><td><a href='/runs/{e(r['id'])}'>{e(r['id'])}</a></td><td>{e(r['ticket']['subject'])}</td>"
-        f"<td class='s-{e(r['status'])}'>{e(r['status'])}</td><td>{len(r.get('results', []))}</td>"
-        f"<td>{'—' if r.get('ground_truth') is None else ('pass' if r['ground_truth'] else 'FAIL')}</td><td>{e(r.get('started_at', '')[:19])}</td></tr>"
-        for r in runs)
-    aprs = "".join(
-        f"<tr><td>{e(a['id'])}</td><td>{e(a['agent'])}</td><td>{e(a['action'])}</td><td><code>{e(a['args_json'])}</code></td><td>{e(a['risk_reason'])}</td>"
-        f"<td><form method='post' action='/approvals/{e(a['id'])}/approve/rerun'><button>Approve + rerun</button></form>"
-        f"<form method='post' action='/approvals/{e(a['id'])}/reject'><button>Reject</button></form></td></tr>" for a in pending)
-    esc = m.get("escalation")
-    esc_txt = f"escalate below confidence {esc['threshold']:.2f} → auto-accept {esc['coverage']:.0%} of claims at {esc['risk']:.1%} residual risk" if esc else "not enough verified claims yet"
-    return f"""<!doctype html><meta charset=utf-8><title>Attest Fleet</title>
-<style>body{{font:14px/1.5 -apple-system,system-ui,sans-serif;margin:2rem auto;max-width:1100px;padding:0 1rem;color:#16211d;background:#f4f5f2}}
-h1{{margin:0}} .sub{{color:#556}} .grid{{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:.5rem;margin:1rem 0}}
-.stat{{background:#fff;border:1px solid #d9ddd8;padding:.6rem .8rem;border-radius:4px}} .stat b{{display:block;font-size:1.4rem}} .stat span{{font-size:.75rem;text-transform:uppercase;letter-spacing:.08em;color:#667}}
-table{{width:100%;border-collapse:collapse;background:#fff;font-size:13px}} th,td{{text-align:left;padding:.45rem .6rem;border-bottom:1px solid #e3e6e2;vertical-align:top}} th{{font-size:.72rem;text-transform:uppercase;letter-spacing:.08em;color:#667}}
-.s-verified{{color:#1f5c42;font-weight:600}} .s-silent_failure{{color:#a32014;font-weight:600}} .s-pending_approval{{color:#8a5000;font-weight:600}} .s-failed,.s-killed{{color:#667}}
-button{{font:inherit;padding:.25rem .6rem;margin:.1rem}} form{{display:inline}} .kill{{background:#a32014;color:#fff;border:0}} .ok{{background:#1f5c42;color:#fff;border:0}} code{{font-size:12px}}
-h2{{margin-top:2rem;font-size:1.1rem}}</style>
-<h1>Attest Fleet</h1><p class=sub>Governed agent fleet on Gemini 3.5 + ADK + Cloud Run + Firestore. Store: <b>{e(store.backend)}</b>.
-Kill switch: <b>{'ENGAGED' if kill_on else 'off'}</b>
-<form method=post action='/fleet/{'resume' if kill_on else 'kill'}'><button class='{'ok' if kill_on else 'kill'}'>{'Resume fleet' if kill_on else 'Kill switch'}</button></form></p>
-<div class=grid>
-<div class=stat><span>Runs</span><b>{m['runs']}</b></div>
-<div class=stat><span>Reported success</span><b>{_fmt(m['reported_success_rate'])}</b></div>
-<div class=stat><span>Verified success</span><b>{_fmt(m['verified_success_rate'])}</b></div>
-<div class=stat><span>Silent failure rate</span><b style='color:#a32014'>{_fmt(m['silent_failure_rate'])}</b></div>
-<div class=stat><span>False alarms</span><b>{_fmt(m['false_alarm_rate'])}</b></div>
-<div class=stat><span>Brier / ECE</span><b>{_fmt(m['brier'])} / {_fmt(m['ece'])}</b></div>
-<div class=stat><span>Eval ground truth</span><b>{_fmt(m['eval_ground_truth_pass_rate'])}</b></div>
-</div>
-<p><b>Escalation policy:</b> {e(esc_txt)}.</p>
-<h2>Pending approvals ({len(pending)})</h2>
-<table><tr><th>id</th><th>agent</th><th>action</th><th>args</th><th>why</th><th></th></tr>{aprs or '<tr><td colspan=6>none</td></tr>'}</table>
-<h2>Recent runs</h2>
-<table><tr><th>run</th><th>ticket</th><th>status</th><th>tasks</th><th>eval</th><th>started</th></tr>{rows or '<tr><td colspan=6>none yet — POST /tickets</td></tr>'}</table>
-<p class=sub>API: <a href='/metrics'>/metrics</a> · <a href='/runs'>/runs</a> · <a href='/approvals'>/approvals</a> · <a href='/fleet/identities'>/fleet/identities</a> · <a href='/fleet/playbook'>/fleet/playbook</a> · <a href='/docs'>/docs</a></p>"""
+_STATIC = os.path.join(os.path.dirname(__file__), "static")
 
 
-@app.post("/fleet/kill", include_in_schema=False)
-def kill_form():
-    kill()
-    return RedirectResponse("/", status_code=303)
-
-
-@app.post("/fleet/resume", include_in_schema=False)
-def resume_form():
-    resume()
-    return RedirectResponse("/", status_code=303)
+@app.get("/", response_class=HTMLResponse, include_in_schema=False)
+def dashboard() -> HTMLResponse:
+    return HTMLResponse(Path(os.path.join(_STATIC, "index.html")).read_text(encoding="utf-8"))
