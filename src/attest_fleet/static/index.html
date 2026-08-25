@@ -254,6 +254,17 @@ button{font-family:inherit; cursor:pointer}
 .toast{position:fixed; bottom:20px; left:50%; transform:translateX(-50%) translateY(20px); background:var(--raised); border:1px solid var(--line-strong); color:var(--ink); padding:11px 18px; border-radius:var(--r); font-size:13px; box-shadow:var(--shadow-lg); opacity:0; transition:.24s; z-index:60; pointer-events:none}
 .toast.show{opacity:1; transform:translateX(-50%) translateY(0)}
 
+#tooltip{position:fixed; z-index:70; max-width:290px; background:var(--raised); color:var(--ink); border:1px solid var(--line-strong); border-radius:9px; padding:11px 13px; box-shadow:var(--shadow-lg); font-size:12.5px; line-height:1.55; opacity:0; visibility:hidden; transition:opacity .12s; pointer-events:none}
+#tooltip.show{opacity:1; visibility:visible}
+#tooltip b{display:block; font-size:12px; letter-spacing:.01em; margin-bottom:4px}
+#tooltip p{margin:0; color:var(--ink-2)}
+#tooltip em{display:block; margin-top:7px; color:var(--muted); font-style:normal; font-family:var(--mono); font-size:11px; border-top:1px solid var(--line); padding-top:6px}
+[data-tip]{cursor:help}
+.k[data-tip], .lbl[data-tip], .hero-eyebrow[data-tip]{text-decoration:underline dotted color-mix(in srgb,var(--muted) 55%,transparent); text-underline-offset:3px; text-decoration-thickness:1px}
+.k[data-tip]:hover, .lbl[data-tip]:hover, .hero-eyebrow[data-tip]:hover{text-decoration-color:var(--accent)}
+.exbadge{font-family:var(--mono); font-size:10px; letter-spacing:.1em; color:var(--warn); background:var(--warn-bg); border:1px solid var(--warn-line); padding:3px 7px; border-radius:5px; text-transform:uppercase}
+.exbadge[hidden]{display:none}
+#exBtn.on{border-color:var(--warn-line); color:var(--warn); background:var(--warn-bg)}
 .foot{margin-top:34px; padding-top:16px; border-top:1px solid var(--line); font-size:12px; color:var(--muted); display:flex; flex-wrap:wrap; gap:6px 16px; align-items:center}
 .foot a{color:var(--muted); text-decoration:none; font-family:var(--mono)}
 .foot a:hover{color:var(--accent)}
@@ -285,10 +296,12 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
       <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 3l7 2.3v5c0 4.6-3 7.7-7 9.7-4-2-7-5.1-7-9.7v-5z" stroke="currentColor" stroke-width="1.7"/><path d="M8.5 12l2.6 2.6L15.8 9" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>
       <b>Attest&nbsp;Fleet</b>
     </div>
+    <span class="exbadge" id="exBadge" hidden>Example data</span>
     <span class="live"><i class="dot"></i><span id="liveState">live</span></span>
     <div class="spacer"></div>
     <span class="chip" id="storeChip">store <b>–</b></span>
     <span class="chip" id="modelChip" title="controller model">model <b>–</b></span>
+    <button class="btn btn-sm" id="exBtn" title="Load sample runs to explore the interface">Example data</button>
     <button class="iconbtn" id="themeBtn" title="Toggle theme" aria-label="Toggle theme"></button>
     <button class="btn btn-kill" id="killBtn"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8.3" stroke="currentColor" stroke-width="1.7"/><path d="M12 7v6" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg><span>Kill switch</span></button>
   </header>
@@ -302,13 +315,13 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
   <section class="hero" aria-label="Verification summary">
     <div class="hero-in">
       <div class="hero-left">
-        <div class="hero-eyebrow">Silent failure rate</div>
+        <div class="hero-eyebrow" data-tip="sf" tabindex="0">Silent failure rate</div>
         <div class="hero-num" id="sfNum">–</div>
         <p class="hero-sub">Runs the fleet reported <b style="color:var(--ink)">done</b> that the system of record says were <b style="color:var(--crit)">not</b>. Invisible to the agents' own scoreboard.</p>
       </div>
       <div class="hero-right">
-        <div class="gap-row"><span class="lbl">Reported</span><span class="bar rep"><i id="repBar" style="width:0"></i></span><span class="val" id="repVal">–</span></div>
-        <div class="gap-row"><span class="lbl">Verified</span><span class="bar ver"><i id="verBar" style="width:0"></i></span><span class="val ok" id="verVal" style="color:var(--ok)">–</span></div>
+        <div class="gap-row"><span class="lbl" data-tip="reported" tabindex="0">Reported</span><span class="bar rep"><i id="repBar" style="width:0"></i></span><span class="val" id="repVal">–</span></div>
+        <div class="gap-row"><span class="lbl" data-tip="verified" tabindex="0">Verified</span><span class="bar ver"><i id="verBar" style="width:0"></i></span><span class="val ok" id="verVal" style="color:var(--ok)">–</span></div>
         <div class="gap-note"><svg viewBox="0 0 24 24" width="15" height="15" fill="none"><path d="M4 12h16M14 6l6 6-6 6" stroke="var(--crit)" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg><span>The overstatement: <b id="gapVal">&mdash;</b> of claimed successes were false.</span></div>
       </div>
     </div>
@@ -318,7 +331,7 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
 
   <div class="esc" id="escBox">
     <svg viewBox="0 0 24 24" fill="none"><path d="M12 3l7 2.3v5c0 4.6-3 7.7-7 9.7-4-2-7-5.1-7-9.7v-5z" stroke="currentColor" stroke-width="1.6"/><path d="M12 8v4.5M12 15.4v.1" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
-    <span id="escTxt">Computing escalation policy…</span>
+    <span id="escTxt" data-tip="esc" tabindex="0">Computing escalation policy…</span>
   </div>
 
   <!-- TABS -->
@@ -395,6 +408,7 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
 </aside>
 
 <div class="toast" id="toast"></div>
+<div id="tooltip" role="tooltip"></div>
 
 <script>
 const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>[...r.querySelectorAll(s)];
@@ -405,7 +419,41 @@ const num=v=>v==null?"–":v;
 const ST={verified:{c:"var(--ok)",l:"verified"},silent_failure:{c:"var(--crit)",l:"silent failure"},pending_approval:{c:"var(--warn)",l:"pending approval"},failed:{c:"var(--muted)",l:"failed"},killed:{c:"var(--muted)",l:"killed"},running:{c:"var(--accent)",l:"running"}};
 const stMeta=s=>ST[s]||{c:"var(--muted)",l:s||"–"};
 const short=t=>t?t.replace("T"," ").slice(5,19):"";
-let drawerOpen=false, state={tab:"overview",q:"",status:"",sort:"started",order:"desc",offset:0,limit:12,total:0};
+let drawerOpen=false, exampleMode=false, state={tab:"overview",q:"",status:"",sort:"started",order:"desc",offset:0,limit:12,total:0};
+const EXAMPLE={"metrics":{"n_tasks":6,"n_verifiable":6,"reported_success_rate":0.6667,"verified_success_rate":0.5,"silent_failure_rate":0.25,"silent_failures":1,"false_alarm_rate":0.0,"false_alarms":0,"brier":0.1488,"ece":0.255,"risk_coverage":[{"threshold":0.98,"coverage":0.25,"risk":0.0,"n":1},{"threshold":0.97,"coverage":0.5,"risk":0.0,"n":2},{"threshold":0.95,"coverage":0.75,"risk":0.0,"n":3},{"threshold":0.83,"coverage":1.0,"risk":0.25,"n":4}],"escalation":{"threshold":0.95,"coverage":0.75,"risk":0.0,"n":3,"target_risk":0.02},"eval_ground_truth_pass_rate":0.8,"runs":6,"by_status":{"verified":3,"silent_failure":1,"pending_approval":1,"failed":1,"killed":0,"running":0}},"runs":{"items":[{"id":"run_demo6","ticket":{"id":"tkt_run_demo6","source":"simulator","customer_ref":"meiling@example.com","subject":"Partial refund","body":"Partial refund \u2014 request from meiling@example.com.","created_at":"2026-08-25T20:51:00Z","expected":null},"plan":{"tasks":[{"id":"t1","type":"refund","worker":"billing_agent","customer_id":"cus_1004","order_id":"ord_5004","subscription_id":null,"amount":80.0,"new_address":null,"instruction":"Refund 80 on ord_5004.","rationale":"Removed seats."}],"customer_resolution":"Resolved a single matching customer.","summary":"Partial refund"},"results":[{"task":{"id":"t1","type":"refund","worker":"billing_agent","customer_id":"cus_1004","order_id":"ord_5004","subscription_id":null,"amount":80.0,"new_address":null,"instruction":"Refund 80 on ord_5004.","rationale":"Removed seats."},"claim":{"task_id":"t1","outcome":"done","confidence":0.97,"actions":[],"evidence":"issue_refund completed 80.00; order.refunded=80.0.","note":""},"verification":{"task_id":"t1","verified":true,"method":"postcondition","checks":[{"name":"refund_completed_amount","passed":true,"detail":"completed refunds 80.00, expected 80.00"}],"silent_failure":false,"false_alarm":false,"detail":"ok"}}],"status":"verified","started_at":"2026-08-25T20:51:00Z","finished_at":"2026-08-25T20:51:09Z","error":null,"ground_truth":true},{"id":"run_demo5","ticket":{"id":"tkt_run_demo5","source":"simulator","customer_ref":"cus_1005","subject":"Locked out","body":"Locked out \u2014 request from cus_1005.","created_at":"2026-08-25T20:44:00Z","expected":null},"plan":{"tasks":[{"id":"t1","type":"unlock_account","worker":"account_agent","customer_id":"cus_1005","order_id":null,"subscription_id":null,"amount":null,"new_address":null,"instruction":"Unlock cus_1005.","rationale":"Failed sign-ins."}],"customer_resolution":"Resolved a single matching customer.","summary":"Locked out"},"results":[{"task":{"id":"t1","type":"unlock_account","worker":"account_agent","customer_id":"cus_1005","order_id":null,"subscription_id":null,"amount":null,"new_address":null,"instruction":"Unlock cus_1005.","rationale":"Failed sign-ins."},"claim":{"task_id":"t1","outcome":"failed","confidence":0.2,"actions":[],"evidence":"unlock_account returned IAM_TIMEOUT; account still locked.","note":""},"verification":{"task_id":"t1","verified":false,"method":"postcondition","checks":[{"name":"account_unlocked","passed":false,"detail":"locked=true"}],"silent_failure":false,"false_alarm":false,"detail":"tool errored"}}],"status":"failed","started_at":"2026-08-25T20:44:00Z","finished_at":"2026-08-25T20:44:09Z","error":null,"ground_truth":true},{"id":"run_demo4","ticket":{"id":"tkt_run_demo4","source":"simulator","customer_ref":"d.okafor@example.com","subject":"Cancel my subscription","body":"Cancel my subscription \u2014 request from d.okafor@example.com.","created_at":"2026-08-25T20:38:00Z","expected":null},"plan":{"tasks":[{"id":"t1","type":"cancel_subscription","worker":"account_agent","customer_id":"cus_1003","order_id":null,"subscription_id":"sub_9003","amount":null,"new_address":null,"instruction":"Cancel sub_9003.","rationale":"Budget."}],"customer_resolution":"Resolved a single matching customer.","summary":"Cancel my subscription"},"results":[{"task":{"id":"t1","type":"cancel_subscription","worker":"account_agent","customer_id":"cus_1003","order_id":null,"subscription_id":"sub_9003","amount":null,"new_address":null,"instruction":"Cancel sub_9003.","rationale":"Budget."},"claim":{"task_id":"t1","outcome":"done","confidence":0.95,"actions":[],"evidence":"cancel_subscription returned status=cancelled; read-back confirms.","note":""},"verification":{"task_id":"t1","verified":true,"method":"postcondition","checks":[{"name":"status_cancelled","passed":true,"detail":"status is 'cancelled'"}],"silent_failure":false,"false_alarm":false,"detail":"post-condition holds"}}],"status":"verified","started_at":"2026-08-25T20:38:00Z","finished_at":"2026-08-25T20:38:09Z","error":null,"ground_truth":true},{"id":"run_demo3","ticket":{"id":"tkt_run_demo3","source":"simulator","customer_ref":"cus_1003","subject":"Refund annual plan","body":"Refund annual plan \u2014 request from cus_1003.","created_at":"2026-08-25T20:31:00Z","expected":null},"plan":{"tasks":[{"id":"t1","type":"refund","worker":"billing_agent","customer_id":"cus_1003","order_id":"ord_5003","subscription_id":null,"amount":490.0,"new_address":null,"instruction":"Refund 490 on ord_5003.","rationale":"Customer wants the annual plan refunded."}],"customer_resolution":"Resolved a single matching customer.","summary":"Refund annual plan"},"results":[{"task":{"id":"t1","type":"refund","worker":"billing_agent","customer_id":"cus_1003","order_id":"ord_5003","subscription_id":null,"amount":490.0,"new_address":null,"instruction":"Refund 490 on ord_5003.","rationale":"Customer wants the annual plan refunded."},"claim":{"task_id":"t1","outcome":"blocked","confidence":0.4,"actions":[],"evidence":"issue_refund returned pending_approval (apr_demo); the money did not move.","note":"awaiting approval apr_demo"},"verification":{"task_id":"t1","verified":false,"method":"postcondition","checks":[{"name":"refund_completed_amount","passed":false,"detail":"completed refunds 0.00, expected 490.00"}],"silent_failure":false,"false_alarm":false,"detail":"action gated before execution"}}],"status":"pending_approval","started_at":"2026-08-25T20:31:00Z","finished_at":"2026-08-25T20:31:09Z","error":null,"ground_truth":null},{"id":"run_demo2","ticket":{"id":"tkt_run_demo2","source":"simulator","customer_ref":"cus_1004","subject":"Change my address","body":"Change my address \u2014 request from cus_1004.","created_at":"2026-08-25T20:20:00Z","expected":null},"plan":{"tasks":[{"id":"t1","type":"address_change","worker":"account_agent","customer_id":"cus_1004","order_id":null,"subscription_id":null,"amount":null,"new_address":"200 Century Ave, Pudong, Shanghai 200120","instruction":"Update address for cus_1004.","rationale":"Customer moved."}],"customer_resolution":"Resolved a single matching customer.","summary":"Change my address"},"results":[{"task":{"id":"t1","type":"address_change","worker":"account_agent","customer_id":"cus_1004","order_id":null,"subscription_id":null,"amount":null,"new_address":"200 Century Ave, Pudong, Shanghai 200120","instruction":"Update address for cus_1004.","rationale":"Customer moved."},"claim":{"task_id":"t1","outcome":"done","confidence":0.83,"actions":[],"evidence":"update_address returned success: 'address saved'.","note":""},"verification":{"task_id":"t1","verified":false,"method":"postcondition","checks":[{"name":"address_matches","passed":false,"detail":"address is '88 Nanjing Rd, Shanghai' (write went to a draft field)"}],"silent_failure":true,"false_alarm":false,"detail":"claimed done; system of record disagrees"}}],"status":"silent_failure","started_at":"2026-08-25T20:20:00Z","finished_at":"2026-08-25T20:20:09Z","error":null,"ground_truth":false},{"id":"run_demo1","ticket":{"id":"tkt_run_demo1","source":"simulator","customer_ref":"Priya Sharma","subject":"Refund last month","body":"Refund last month \u2014 request from Priya Sharma.","created_at":"2026-08-25T20:12:00Z","expected":null},"plan":{"tasks":[{"id":"t1","type":"refund","worker":"billing_agent","customer_id":"cus_1001","order_id":"ord_5001","subscription_id":null,"amount":49.0,"new_address":null,"instruction":"Refund 49 on ord_5001.","rationale":"Customer asked for the Pro monthly refund."}],"customer_resolution":"Two customers named Priya Sharma; disambiguated to cus_1001 by the email in the ticket body.","summary":"Refund last month"},"results":[{"task":{"id":"t1","type":"refund","worker":"billing_agent","customer_id":"cus_1001","order_id":"ord_5001","subscription_id":null,"amount":49.0,"new_address":null,"instruction":"Refund 49 on ord_5001.","rationale":"Customer asked for the Pro monthly refund."},"claim":{"task_id":"t1","outcome":"done","confidence":0.98,"actions":[],"evidence":"issue_refund returned state=completed; order.refunded=49.0, status=refunded.","note":""},"verification":{"task_id":"t1","verified":true,"method":"postcondition","checks":[{"name":"refund_completed_amount","passed":true,"detail":"completed refunds 49.00, expected 49.00"},{"name":"order_refunded_field","passed":true,"detail":"order.refunded=49.0"}],"silent_failure":false,"false_alarm":false,"detail":"all post-conditions hold"}}],"status":"verified","started_at":"2026-08-25T20:12:00Z","finished_at":"2026-08-25T20:12:09Z","error":null,"ground_truth":true}],"total":6,"limit":20,"offset":0,"counts":{"verified":3,"silent_failure":1,"pending_approval":1,"failed":1,"killed":0,"running":0}},"approvals":[{"id":"apr_demo","run_id":"run_demo3","ticket_id":"tkt_run_demo3","task_id":"t1","agent":"billing_agent","action":"issue_refund","args_json":"{\"order_id\": \"ord_5003\", \"amount\": 490, \"reason\": \"Full annual refund\"}","risk_reason":"refund 490.00 exceeds the 100 auto-approval limit","status":"pending","created_at":"2026-08-25T20:31:02Z","decided_at":null,"decided_by":null}],"identities":[{"name":"fleet_controller","model":"gemini-3.5-flash-lite","role":"Task decomposition and customer resolution","tools":["find_customer","get_customer","list_orders","get_order","get_subscription"],"mutates":false,"collaborates_with":["billing_agent","account_agent"]},{"name":"billing_agent","model":"gemini-3.5-flash-lite","role":"Refunds and order actions","tools":["get_customer","list_orders","get_order","issue_refund","record_note"],"mutates":true,"collaborates_with":["fleet_controller"]},{"name":"account_agent","model":"gemini-3.5-flash-lite","role":"Address, subscription, lock and deletion actions","tools":["find_customer","get_customer","get_subscription","update_address","cancel_subscription","unlock_account","delete_account","record_note"],"mutates":true,"collaborates_with":["fleet_controller"]},{"name":"auditor","model":"gemma-4-31b-it","role":"LLM verification for tasks without a deterministic post-condition","tools":[],"mutates":false,"collaborates_with":[]}],"playbook":[{"worker":"account_agent","task_type":"address_change","lesson":"After update_address, call get_customer and confirm the 'address' field equals the requested address before claiming done. A success message alone is not evidence.","count":1,"first_seen":"2026-08-25T20:20:00Z","last_seen":"2026-08-25T20:20:00Z","last_run":"run_demo2","id":"address_draft"}],"details":{"run_demo6":{"id":"run_demo6","ticket":{"id":"tkt_run_demo6","source":"simulator","customer_ref":"meiling@example.com","subject":"Partial refund","body":"Partial refund \u2014 request from meiling@example.com.","created_at":"2026-08-25T20:51:00Z","expected":null},"plan":{"tasks":[{"id":"t1","type":"refund","worker":"billing_agent","customer_id":"cus_1004","order_id":"ord_5004","subscription_id":null,"amount":80.0,"new_address":null,"instruction":"Refund 80 on ord_5004.","rationale":"Removed seats."}],"customer_resolution":"Resolved a single matching customer.","summary":"Partial refund"},"results":[{"task":{"id":"t1","type":"refund","worker":"billing_agent","customer_id":"cus_1004","order_id":"ord_5004","subscription_id":null,"amount":80.0,"new_address":null,"instruction":"Refund 80 on ord_5004.","rationale":"Removed seats."},"claim":{"task_id":"t1","outcome":"done","confidence":0.97,"actions":[],"evidence":"issue_refund completed 80.00; order.refunded=80.0.","note":""},"verification":{"task_id":"t1","verified":true,"method":"postcondition","checks":[{"name":"refund_completed_amount","passed":true,"detail":"completed refunds 80.00, expected 80.00"}],"silent_failure":false,"false_alarm":false,"detail":"ok"}}],"status":"verified","started_at":"2026-08-25T20:51:00Z","finished_at":"2026-08-25T20:51:09Z","error":null,"ground_truth":true,"events":[{"id":"evt_c12eefdafa","run_id":"run_demo6","task_id":"t1","agent":"billing_agent","kind":"tool","name":"issue_refund","args_json":"","result_json":"{\"state\":\"completed\"}","latency_ms":79,"ts":"2026-08-25T20:51:00Z"},{"id":"evt_6d9d1adc17","run_id":"run_demo6","task_id":"t1","agent":null,"kind":"verify","name":"verified","args_json":"","result_json":"{\"verified\":true}","latency_ms":null,"ts":"2026-08-25T20:51:01Z"}]},"run_demo5":{"id":"run_demo5","ticket":{"id":"tkt_run_demo5","source":"simulator","customer_ref":"cus_1005","subject":"Locked out","body":"Locked out \u2014 request from cus_1005.","created_at":"2026-08-25T20:44:00Z","expected":null},"plan":{"tasks":[{"id":"t1","type":"unlock_account","worker":"account_agent","customer_id":"cus_1005","order_id":null,"subscription_id":null,"amount":null,"new_address":null,"instruction":"Unlock cus_1005.","rationale":"Failed sign-ins."}],"customer_resolution":"Resolved a single matching customer.","summary":"Locked out"},"results":[{"task":{"id":"t1","type":"unlock_account","worker":"account_agent","customer_id":"cus_1005","order_id":null,"subscription_id":null,"amount":null,"new_address":null,"instruction":"Unlock cus_1005.","rationale":"Failed sign-ins."},"claim":{"task_id":"t1","outcome":"failed","confidence":0.2,"actions":[],"evidence":"unlock_account returned IAM_TIMEOUT; account still locked.","note":""},"verification":{"task_id":"t1","verified":false,"method":"postcondition","checks":[{"name":"account_unlocked","passed":false,"detail":"locked=true"}],"silent_failure":false,"false_alarm":false,"detail":"tool errored"}}],"status":"failed","started_at":"2026-08-25T20:44:00Z","finished_at":"2026-08-25T20:44:09Z","error":null,"ground_truth":true,"events":[{"id":"evt_bb1364b60e","run_id":"run_demo5","task_id":"t1","agent":"account_agent","kind":"tool","name":"unlock_account","args_json":"","result_json":"{\"status\":\"error\",\"error\":\"IAM_TIMEOUT\"}","latency_ms":30,"ts":"2026-08-25T20:44:00Z"},{"id":"evt_7cb3f55634","run_id":"run_demo5","task_id":"t1","agent":null,"kind":"verify","name":"verified","args_json":"","result_json":"{\"verified\":false}","latency_ms":null,"ts":"2026-08-25T20:44:01Z"}]},"run_demo4":{"id":"run_demo4","ticket":{"id":"tkt_run_demo4","source":"simulator","customer_ref":"d.okafor@example.com","subject":"Cancel my subscription","body":"Cancel my subscription \u2014 request from d.okafor@example.com.","created_at":"2026-08-25T20:38:00Z","expected":null},"plan":{"tasks":[{"id":"t1","type":"cancel_subscription","worker":"account_agent","customer_id":"cus_1003","order_id":null,"subscription_id":"sub_9003","amount":null,"new_address":null,"instruction":"Cancel sub_9003.","rationale":"Budget."}],"customer_resolution":"Resolved a single matching customer.","summary":"Cancel my subscription"},"results":[{"task":{"id":"t1","type":"cancel_subscription","worker":"account_agent","customer_id":"cus_1003","order_id":null,"subscription_id":"sub_9003","amount":null,"new_address":null,"instruction":"Cancel sub_9003.","rationale":"Budget."},"claim":{"task_id":"t1","outcome":"done","confidence":0.95,"actions":[],"evidence":"cancel_subscription returned status=cancelled; read-back confirms.","note":""},"verification":{"task_id":"t1","verified":true,"method":"postcondition","checks":[{"name":"status_cancelled","passed":true,"detail":"status is 'cancelled'"}],"silent_failure":false,"false_alarm":false,"detail":"post-condition holds"}}],"status":"verified","started_at":"2026-08-25T20:38:00Z","finished_at":"2026-08-25T20:38:09Z","error":null,"ground_truth":true,"events":[{"id":"evt_fa3eedd2ce","run_id":"run_demo4","task_id":"t1","agent":"account_agent","kind":"tool","name":"cancel_subscription","args_json":"","result_json":"{\"state\":\"cancelled\"}","latency_ms":71,"ts":"2026-08-25T20:38:00Z"},{"id":"evt_61a60e21c5","run_id":"run_demo4","task_id":"t1","agent":null,"kind":"verify","name":"verified","args_json":"","result_json":"{\"verified\":true}","latency_ms":null,"ts":"2026-08-25T20:38:01Z"}]},"run_demo3":{"id":"run_demo3","ticket":{"id":"tkt_run_demo3","source":"simulator","customer_ref":"cus_1003","subject":"Refund annual plan","body":"Refund annual plan \u2014 request from cus_1003.","created_at":"2026-08-25T20:31:00Z","expected":null},"plan":{"tasks":[{"id":"t1","type":"refund","worker":"billing_agent","customer_id":"cus_1003","order_id":"ord_5003","subscription_id":null,"amount":490.0,"new_address":null,"instruction":"Refund 490 on ord_5003.","rationale":"Customer wants the annual plan refunded."}],"customer_resolution":"Resolved a single matching customer.","summary":"Refund annual plan"},"results":[{"task":{"id":"t1","type":"refund","worker":"billing_agent","customer_id":"cus_1003","order_id":"ord_5003","subscription_id":null,"amount":490.0,"new_address":null,"instruction":"Refund 490 on ord_5003.","rationale":"Customer wants the annual plan refunded."},"claim":{"task_id":"t1","outcome":"blocked","confidence":0.4,"actions":[],"evidence":"issue_refund returned pending_approval (apr_demo); the money did not move.","note":"awaiting approval apr_demo"},"verification":{"task_id":"t1","verified":false,"method":"postcondition","checks":[{"name":"refund_completed_amount","passed":false,"detail":"completed refunds 0.00, expected 490.00"}],"silent_failure":false,"false_alarm":false,"detail":"action gated before execution"}}],"status":"pending_approval","started_at":"2026-08-25T20:31:00Z","finished_at":"2026-08-25T20:31:09Z","error":null,"ground_truth":null,"events":[{"id":"evt_60b082cb4e","run_id":"run_demo3","task_id":"t1","agent":"billing_agent","kind":"policy","name":"approval_required","args_json":"{\"tool\":\"issue_refund\",\"amount\":490}","result_json":"{\"approval_id\":\"apr_demo\"}","latency_ms":null,"ts":"2026-08-25T20:31:00Z"}]},"run_demo2":{"id":"run_demo2","ticket":{"id":"tkt_run_demo2","source":"simulator","customer_ref":"cus_1004","subject":"Change my address","body":"Change my address \u2014 request from cus_1004.","created_at":"2026-08-25T20:20:00Z","expected":null},"plan":{"tasks":[{"id":"t1","type":"address_change","worker":"account_agent","customer_id":"cus_1004","order_id":null,"subscription_id":null,"amount":null,"new_address":"200 Century Ave, Pudong, Shanghai 200120","instruction":"Update address for cus_1004.","rationale":"Customer moved."}],"customer_resolution":"Resolved a single matching customer.","summary":"Change my address"},"results":[{"task":{"id":"t1","type":"address_change","worker":"account_agent","customer_id":"cus_1004","order_id":null,"subscription_id":null,"amount":null,"new_address":"200 Century Ave, Pudong, Shanghai 200120","instruction":"Update address for cus_1004.","rationale":"Customer moved."},"claim":{"task_id":"t1","outcome":"done","confidence":0.83,"actions":[],"evidence":"update_address returned success: 'address saved'.","note":""},"verification":{"task_id":"t1","verified":false,"method":"postcondition","checks":[{"name":"address_matches","passed":false,"detail":"address is '88 Nanjing Rd, Shanghai' (write went to a draft field)"}],"silent_failure":true,"false_alarm":false,"detail":"claimed done; system of record disagrees"}}],"status":"silent_failure","started_at":"2026-08-25T20:20:00Z","finished_at":"2026-08-25T20:20:09Z","error":null,"ground_truth":false,"events":[{"id":"evt_ce05c7c8b0","run_id":"run_demo2","task_id":"t1","agent":"account_agent","kind":"tool","name":"update_address","args_json":"{\"customer_id\":\"cus_1004\"}","result_json":"{\"status\":\"success\",\"message\":\"address saved\"}","latency_ms":62,"ts":"2026-08-25T20:20:00Z"},{"id":"evt_c9f99c8471","run_id":"run_demo2","task_id":"t1","agent":null,"kind":"verify","name":"verified","args_json":"","result_json":"{\"verified\":false,\"silent_failure\":true}","latency_ms":null,"ts":"2026-08-25T20:20:01Z"},{"id":"evt_40eab45764","run_id":"run_demo2","task_id":"t1","agent":"account_agent","kind":"experience","name":"lesson_captured","args_json":"{\"signature\":\"address_draft\"}","result_json":"","latency_ms":null,"ts":"2026-08-25T20:20:02Z"}]},"run_demo1":{"id":"run_demo1","ticket":{"id":"tkt_run_demo1","source":"simulator","customer_ref":"Priya Sharma","subject":"Refund last month","body":"Refund last month \u2014 request from Priya Sharma.","created_at":"2026-08-25T20:12:00Z","expected":null},"plan":{"tasks":[{"id":"t1","type":"refund","worker":"billing_agent","customer_id":"cus_1001","order_id":"ord_5001","subscription_id":null,"amount":49.0,"new_address":null,"instruction":"Refund 49 on ord_5001.","rationale":"Customer asked for the Pro monthly refund."}],"customer_resolution":"Two customers named Priya Sharma; disambiguated to cus_1001 by the email in the ticket body.","summary":"Refund last month"},"results":[{"task":{"id":"t1","type":"refund","worker":"billing_agent","customer_id":"cus_1001","order_id":"ord_5001","subscription_id":null,"amount":49.0,"new_address":null,"instruction":"Refund 49 on ord_5001.","rationale":"Customer asked for the Pro monthly refund."},"claim":{"task_id":"t1","outcome":"done","confidence":0.98,"actions":[],"evidence":"issue_refund returned state=completed; order.refunded=49.0, status=refunded.","note":""},"verification":{"task_id":"t1","verified":true,"method":"postcondition","checks":[{"name":"refund_completed_amount","passed":true,"detail":"completed refunds 49.00, expected 49.00"},{"name":"order_refunded_field","passed":true,"detail":"order.refunded=49.0"}],"silent_failure":false,"false_alarm":false,"detail":"all post-conditions hold"}}],"status":"verified","started_at":"2026-08-25T20:12:00Z","finished_at":"2026-08-25T20:12:09Z","error":null,"ground_truth":true,"events":[{"id":"evt_4e7e76eeed","run_id":"run_demo1","task_id":"t1","agent":"fleet_controller","kind":"tool","name":"find_customer","args_json":"","result_json":"{\"count\":2,\"ambiguous\":true}","latency_ms":41,"ts":"2026-08-25T20:12:00Z"},{"id":"evt_6f6d95df59","run_id":"run_demo1","task_id":"t1","agent":"billing_agent","kind":"tool","name":"issue_refund","args_json":"{\"order_id\":\"ord_5001\",\"amount\":49}","result_json":"{\"state\":\"completed\"}","latency_ms":88,"ts":"2026-08-25T20:12:01Z"},{"id":"evt_27affda304","run_id":"run_demo1","task_id":"t1","agent":null,"kind":"verify","name":"verified","args_json":"","result_json":"{\"verified\":true}","latency_ms":null,"ts":"2026-08-25T20:12:02Z"}]}}};
+const TIPS={
+ sf:{t:"Silent failure rate",b:"How often the fleet reports a task \u2018done\u2019 that the system of record says was NOT done. The failure nobody sees on a normal dashboard.",e:"An agent \u2018refunds\u2019 an order but the money never left \u2014 the run still shows green."},
+ reported:{t:"Reported success",b:"The success rate the agents claim, taken from their own self-reports."},
+ verified:{t:"Verified success",b:"The success rate after Attest independently re-checks the real system of record. The gap below reported is the overstatement."},
+ false_alarm:{t:"False alarms",b:"How often an agent said it FAILED but the work was actually fine \u2014 the cost of over-cautious verifying."},
+ brier:{t:"Brier score",b:"Are the agents\u2019 confidence numbers honest? 0 = perfectly calibrated, higher = worse. A confident wrong answer is punished hardest."},
+ ece:{t:"Expected Calibration Error",b:"The average gap between how confident the agents are and how often they are actually right."},
+ gt:{t:"Eval ground truth",b:"On test tickets that carry a hidden correct answer, how often the fleet actually reached the right end state."},
+ esc:{t:"Escalation policy",b:"Where to draw the human-review line: runs the agent is unsure about go to a person, the rest auto-accept.",e:"Below 0.95 confidence a human checks it; above, it auto-accepts."},
+ runs:{t:"Runs",b:"Total tickets the fleet has processed."},
+ conf:{t:"Confidence",b:"The agent\u2019s own probability that its outcome is actually true. Attest checks whether that confidence is earned."},
+ verdict:{t:"Verification",b:"Attest\u2019s independent verdict from the system of record \u2014 not the agent\u2019s word."},
+};
+function DATA(path){ return exampleMode ? Promise.resolve(exampleFor(path)) : api(path); }
+function exampleFor(path){
+  const [pt,qs]=path.split("?"); const q=new URLSearchParams(qs||"");
+  if(pt==="/health") return {ok:true,store:"example",kill_switch:false,models:{controller:"gemini-3.5-flash-lite",worker:"gemini-3.5-flash-lite"}};
+  if(pt==="/metrics") return EXAMPLE.metrics;
+  if(pt==="/fleet/identities") return EXAMPLE.identities;
+  if(pt==="/fleet/playbook") return EXAMPLE.playbook;
+  if(pt==="/approvals"){const st=q.get("status"); return st?EXAMPLE.approvals.filter(a=>a.status===st):EXAMPLE.approvals;}
+  if(pt.startsWith("/runs/")) return EXAMPLE.details[pt.slice(6)];
+  if(pt==="/runs"){ let items=EXAMPLE.runs.items.slice();
+    const st=q.get("status"), qq=(q.get("q")||"").toLowerCase(), sort=q.get("sort")||"started", order=q.get("order")||"desc";
+    if(st) items=items.filter(r=>r.status===st);
+    if(qq) items=items.filter(r=>(r.id+r.ticket.subject+r.ticket.customer_ref).toLowerCase().includes(qq));
+    const key={started:r=>r.started_at,subject:r=>r.ticket.subject.toLowerCase(),status:r=>r.status,tasks:r=>(r.results||[]).length}[sort]||(r=>r.started_at);
+    items.sort((a,b)=>{const x=key(a),y=key(b); return (x>y?1:x<y?-1:0)*(order==="asc"?1:-1);});
+    const total=items.length, limit=+q.get("limit")||12, offset=+q.get("offset")||0;
+    return {items:items.slice(offset,offset+limit),total,limit,offset,counts:EXAMPLE.runs.counts};
+  }
+  return null;
+}
 
 /* theme */
 const THEME_KEY="attest-theme";
@@ -423,7 +471,7 @@ function setTab(name){
   state.tab=name;
   $$(".tab").forEach(t=>t.setAttribute("aria-selected", t.dataset.tab===name));
   $$(".panel").forEach(p=>p.hidden=(p.id!=="p-"+name));
-  if(name==="runs")loadRuns(); else if(name==="approvals")loadApprovals(); else if(name==="fleet")loadFleet(); else if(name==="playbook")loadPlaybook();
+  if(name==="overview")loadOverview(); else if(name==="runs")loadRuns(); else if(name==="approvals")loadApprovals(); else if(name==="fleet")loadFleet(); else if(name==="playbook")loadPlaybook();
 }
 $("#tabs").onclick=e=>{const b=e.target.closest(".tab"); if(b)setTab(b.dataset.tab);};
 $$("[data-goto]").forEach(b=>b.onclick=()=>setTab(b.dataset.goto));
@@ -431,21 +479,21 @@ $$("[data-goto]").forEach(b=>b.onclick=()=>setTab(b.dataset.goto));
 /* metrics + hero */
 async function loadMetrics(){
   try{
-    const h=await api("/health"); $("#storeChip").innerHTML="store <b>"+esc(h.store)+"</b>"; $("#modelChip").innerHTML="model <b>"+esc(h.models.controller.replace("gemini-",""))+"</b>"; setKill(!!h.kill_switch);
+    const h=await DATA("/health"); $("#storeChip").innerHTML="store <b>"+esc(h.store)+"</b>"; $("#modelChip").innerHTML="model <b>"+esc(h.models.controller.replace("gemini-",""))+"</b>"; setKill(!!h.kill_switch);
   }catch(e){}
-  let m; try{m=await api("/metrics")}catch(e){return}
+  let m; try{m=await DATA("/metrics")}catch(e){return}
   const rep=m.reported_success_rate, ver=m.verified_success_rate, sf=m.silent_failure_rate;
   $("#sfNum").innerHTML = sf==null? '<span style="font-size:.5em;color:var(--muted)">no data yet</span>' : (sf*100).toFixed(1)+'<small>%</small>';
   $("#repVal").textContent=pct(rep); $("#verVal").textContent=pct(ver); $("#gapVal").textContent=pct(sf);
   $("#repBar").style.transform="scaleX("+(rep||0)+")"; $("#verBar").style.transform="scaleX("+(ver||0)+")";
   const strip=[
-    {k:"Runs",v:num(m.runs),icon:'<path d="M4 7h16M4 12h16M4 17h10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>'},
-    {k:"False alarms",v:pct(m.false_alarm_rate),icon:'<path d="M12 8v5M12 16v.1" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><circle cx="12" cy="12" r="8.3" stroke="currentColor" stroke-width="1.5"/>'},
-    {k:"Brier",v:num(m.brier),icon:'<path d="M4 19V5M4 19h16" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M8 15l3-4 3 2 4-6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>'},
-    {k:"ECE",v:num(m.ece),icon:'<circle cx="12" cy="12" r="8.3" stroke="currentColor" stroke-width="1.5"/><path d="M12 7v5l3 2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>'},
-    {k:"Eval ground truth",v:pct(m.eval_ground_truth_pass_rate),cls:m.eval_ground_truth_pass_rate!=null?"ok":"",icon:'<path d="M9 12l2 2 4-4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="12" r="8.3" stroke="currentColor" stroke-width="1.5"/>'},
+    {k:"Runs",tip:"runs",v:num(m.runs),icon:'<path d="M4 7h16M4 12h16M4 17h10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>'},
+    {k:"False alarms",tip:"false_alarm",v:pct(m.false_alarm_rate),icon:'<path d="M12 8v5M12 16v.1" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><circle cx="12" cy="12" r="8.3" stroke="currentColor" stroke-width="1.5"/>'},
+    {k:"Brier",tip:"brier",v:num(m.brier),icon:'<path d="M4 19V5M4 19h16" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M8 15l3-4 3 2 4-6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>'},
+    {k:"ECE",tip:"ece",v:num(m.ece),icon:'<circle cx="12" cy="12" r="8.3" stroke="currentColor" stroke-width="1.5"/><path d="M12 7v5l3 2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>'},
+    {k:"Eval ground truth",tip:"gt",v:pct(m.eval_ground_truth_pass_rate),cls:m.eval_ground_truth_pass_rate!=null?"ok":"",icon:'<path d="M9 12l2 2 4-4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="12" r="8.3" stroke="currentColor" stroke-width="1.5"/>'},
   ];
-  $("#strip").innerHTML=strip.map(s=>`<div class="metric"><div class="k"><svg viewBox="0 0 24 24" fill="none">${s.icon}</svg>${s.k}</div><div class="v ${s.cls||""} ${String(s.v).length>7?'small':''}">${esc(s.v)}</div></div>`).join("");
+  $("#strip").innerHTML=strip.map(s=>`<div class="metric"><div class="k" data-tip="${s.tip}" tabindex="0"><svg viewBox="0 0 24 24" fill="none">${s.icon}</svg>${s.k}</div><div class="v ${s.cls||""} ${String(s.v).length>7?'small':''}">${esc(s.v)}</div></div>`).join("");
   const e2=m.escalation;
   $("#escTxt").innerHTML = e2
     ? `<b>Escalation policy:</b> route runs below confidence <b>${e2.threshold.toFixed(2)}</b> to a human. Auto-accept <b>${(e2.coverage*100).toFixed(0)}%</b> of claims at <b>${(e2.risk*100).toFixed(1)}%</b> residual silent-failure risk.`
@@ -454,6 +502,7 @@ async function loadMetrics(){
 }
 
 $("#killBtn").onclick=async()=>{
+  if(exampleMode){toast("Example mode is read-only");return;}
   const engaged=$("#killBtn").classList.contains("engaged");
   try{ await api(engaged?"/fleet/resume":"/fleet/kill",{method:"POST"});
     setKill(!engaged); toast(engaged?"Fleet resumed":"Kill switch engaged – mutations blocked");
@@ -485,7 +534,7 @@ function wireRows(box){box.onclick=e=>{const r=e.target.closest(".row"); if(r)op
 async function loadOverview(){
   const box=$("#ovRows"); if(!box.dataset.loaded)box.innerHTML='<div class="sk"></div><div class="sk"></div><div class="sk"></div>';
   try{
-    const d=await api("/runs?limit=6"); box.dataset.loaded=1;
+    const d=await DATA("/runs?limit=6"); box.dataset.loaded=1;
     box.innerHTML = d.items.length? d.items.map(rowHTML).join("") : emptyRuns();
     wireRows(box);
   }catch(e){box.innerHTML=emptyRuns();}
@@ -499,7 +548,7 @@ async function loadRuns(){
   const box=$("#runRows");
   if(!box.dataset.loaded)box.innerHTML=Array(5).fill('<div class="sk"></div>').join("");
   const p=new URLSearchParams({q:state.q,status:state.status,sort:state.sort,order:state.order,limit:state.limit,offset:state.offset});
-  let d; try{d=await api("/runs?"+p)}catch(e){box.innerHTML=emptyRuns(); return}
+  let d; try{d=await DATA("/runs?"+p)}catch(e){box.innerHTML=emptyRuns(); return}
   state.total=d.total; box.dataset.loaded=1;
   renderFchips(d.counts, d.total);
   box.innerHTML = d.items.length? d.items.map(rowHTML).join("") : (state.q||state.status? `<div class="empty"><h3>No matching runs</h3><p>Nothing matches this filter. Clear the search or status.</p></div>` : emptyRuns());
@@ -522,7 +571,7 @@ $("#next").onclick=()=>{state.offset+=state.limit; loadRuns();};
 /* approvals */
 async function loadApprovals(){
   const box=$("#apprCards"); if(!box.dataset.loaded)box.innerHTML='<div class="sk" style="height:150px"></div><div class="sk" style="height:150px"></div>';
-  let d; try{d=await api("/approvals?status=pending")}catch(e){d=[]}
+  let d; try{d=await DATA("/approvals?status=pending")}catch(e){d=[]}
   box.dataset.loaded=1;
   $("#cAppr").textContent=d.length; $("#cAppr").classList.toggle("alert",d.length>0);
   if(!d.length){box.innerHTML=`<div class="empty" style="grid-column:1/-1"><svg viewBox="0 0 24 24" fill="none"><path d="M12 3l7 2.3v5c0 4.6-3 7.7-7 9.7-4-2-7-5.1-7-9.7v-5z" stroke="currentColor" stroke-width="1.5"/><path d="M9 12l2 2 4-4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg><h3>No actions awaiting approval</h3><p>High-risk tool calls (large refunds, deletions) pause here for a human before they run.</p></div>`; return;}
@@ -532,6 +581,7 @@ async function loadApprovals(){
     <div class="btns"><button class="btn btn-sm btn-accent" data-approve="${esc(a.id)}">Approve &amp; rerun</button><button class="btn btn-sm" data-reject="${esc(a.id)}">Reject</button></div></div>`;}).join("");
 }
 $("#apprCards").onclick=async e=>{
+  if(exampleMode){toast("Example mode is read-only");return;}
   const ap=e.target.closest("[data-approve]"), rj=e.target.closest("[data-reject]");
   if(ap){try{await api(`/approvals/${ap.dataset.approve}/approve/rerun`,{method:"POST"}); toast("Approved – re-running the ticket"); loadApprovals(); setTimeout(loadMetrics,1500);}catch(e){toast("Failed")}}
   if(rj){try{await api(`/approvals/${rj.dataset.reject}/reject`,{method:"POST"}); toast("Rejected"); loadApprovals();}catch(e){toast("Failed")}}
@@ -540,7 +590,7 @@ $("#apprCards").onclick=async e=>{
 /* fleet */
 async function loadFleet(){
   const box=$("#fleetCards"); box.innerHTML='<div class="sk" style="height:150px"></div>'.repeat(4);
-  let d; try{d=await api("/fleet/identities")}catch(e){d=[]}
+  let d; try{d=await DATA("/fleet/identities")}catch(e){d=[]}
   box.innerHTML=d.map(a=>`<div class="card idcard"><div class="card-h"><span class="who mono" style="color:var(--ink);font-size:13px">${esc(a.name)}</span><span class="tag ${a.mutates?'warn':'mut'}">${a.mutates?'mutating':'read-only'}</span></div>
     <div class="role">${esc(a.role)}</div>
     <div class="tools">${(a.tools||[]).map(t=>`<span>${esc(t)}</span>`).join("")||'<span style="opacity:.5">no tools</span>'}</div>
@@ -550,7 +600,7 @@ async function loadFleet(){
 /* playbook */
 async function loadPlaybook(){
   const box=$("#playCards"); box.innerHTML='<div class="sk" style="height:110px"></div><div class="sk" style="height:110px"></div>';
-  let d; try{d=await api("/fleet/playbook")}catch(e){d=[]}
+  let d; try{d=await DATA("/fleet/playbook")}catch(e){d=[]}
   $("#cPlay").textContent=d.length;
   if(!d.length){box.innerHTML=`<div class="empty" style="grid-column:1/-1"><svg viewBox="0 0 24 24" fill="none"><path d="M5 4h11a2 2 0 012 2v14H7a2 2 0 01-2-2z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg><h3>Playbook is empty</h3><p>When the verifier catches a silent failure, the fleet distills it into a lesson here and injects it into that worker's next run.</p></div>`; return;}
   box.innerHTML=d.map(l=>`<div class="card"><div class="lesson"><div class="sig">${esc(l.id||l.signature||"lesson")} · ${esc(l.worker||"")}</div><div class="txt">${esc(l.lesson)}</div><div class="n">seen ${l.count||1}× · last ${esc(short(l.last_seen))}</div></div></div>`).join("");
@@ -560,7 +610,7 @@ async function loadPlaybook(){
 async function openDrawer(id){
   const dr=$("#drawer"), sc=$("#scrim"); dr.classList.add("open"); sc.classList.add("open"); dr.setAttribute("aria-hidden","false"); drawerOpen=true;
   $("#drawerRid").textContent=id; $("#drawerBody").innerHTML='<div class="sk" style="height:80px"></div><div class="sk" style="height:120px"></div>';
-  let r; try{r=await api("/runs/"+id)}catch(e){$("#drawerBody").innerHTML='<p style="color:var(--muted)">Could not load run.</p>'; return;}
+  let r; try{r=await DATA("/runs/"+id)}catch(e){$("#drawerBody").innerHTML='<p style="color:var(--muted)">Could not load run.</p>'; return;}
   const s=stMeta(r.status); const ds=$("#drawerStatus"); ds.textContent=s.l; ds.className="verdict "+(r.status==="verified"?"v-ok":r.status==="silent_failure"?"v-silent":"v-none");
   const tick=r.ticket||{};
   let h=`<div><div class="dh2">Trigger</div><div class="ticket-box"><div class="subj">${esc(tick.subject)}</div><div class="ref">${esc(tick.customer_ref)} · ${esc(tick.source||'webhook')}</div><div class="body">${esc(tick.body)}</div></div></div>`;
@@ -593,10 +643,32 @@ function closeDrawer(){$("#drawer").classList.remove("open"); $("#scrim").classL
 $("#drawerClose").onclick=closeDrawer; $("#scrim").onclick=closeDrawer;
 addEventListener("keydown",e=>{if(e.key==="Escape"&&drawerOpen)closeDrawer();});
 
+/* tooltips */
+const tipEl=$("#tooltip");
+function showTip(el){const d=TIPS[el.dataset.tip]; if(!d)return; tipEl.innerHTML=`<b>${esc(d.t)}</b><p>${esc(d.b)}</p>${d.e?`<em>${esc(d.e)}</em>`:""}`; tipEl.classList.add("show"); const r=el.getBoundingClientRect(), tw=tipEl.offsetWidth, th=tipEl.offsetHeight; let x=r.left, y=r.bottom+8; if(x+tw>innerWidth-12)x=innerWidth-tw-12; if(y+th>innerHeight-12)y=r.top-th-8; tipEl.style.left=Math.max(12,x)+"px"; tipEl.style.top=Math.max(12,y)+"px";}
+function hideTip(){tipEl.classList.remove("show");}
+document.addEventListener("mouseover",e=>{const el=e.target.closest("[data-tip]"); if(el)showTip(el); else if(!e.target.closest("#tooltip"))hideTip();});
+document.addEventListener("focusin",e=>{const el=e.target.closest("[data-tip]"); el?showTip(el):hideTip();});
+document.addEventListener("focusout",hideTip);
+addEventListener("scroll",hideTip,true);
+addEventListener("keydown",e=>{if(e.key==="Escape")hideTip();});
+
+/* example mode */
+function setExample(on){
+  exampleMode=on; $("#ovRows").dataset.loaded=""; $("#runRows").dataset.loaded=""; $("#apprCards").dataset.loaded="";
+  $("#exBtn").classList.toggle("on",on); $("#exBtn").textContent=on?"Live data":"Example data";
+  $("#exBadge").hidden=!on; $("#liveState").textContent=on?"example":"live";
+  loadMetrics(); setTab(state.tab);
+}
+$("#exBtn").onclick=()=>setExample(!exampleMode);
+
 /* boot + poll */
 async function tick(){ await loadMetrics(); if(state.tab==="overview")loadOverview(); if(state.tab==="approvals")loadApprovals(); }
-(async function(){ await loadMetrics(); loadOverview();
-  setInterval(()=>{ if(!drawerOpen) tick(); }, 5000);
+(async function(){
+  let m; try{m=await api("/metrics")}catch(e){}
+  if(!m || !m.runs){ setExample(true); toast("No live runs yet \u2014 showing example data"); return; }
+  await loadMetrics(); loadOverview();
+  setInterval(()=>{ if(!drawerOpen && !exampleMode) tick(); }, 5000);
 })();
 </script>
 </body>
