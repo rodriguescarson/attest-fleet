@@ -30,15 +30,16 @@ T = TypeVar("T", bound=BaseModel)
 _agents: dict[str, Any] = {}
 
 
-def _agent(name: str):
-    if name not in _agents:
+def _agent(name: str, model: Optional[str] = None):
+    key = (name, model)
+    if key not in _agents:
         if name == "fleet_controller":
-            _agents[name] = build_controller()
+            _agents[key] = build_controller(model)
         elif name == "auditor":
-            _agents[name] = build_auditor()
+            _agents[key] = build_auditor(model)
         else:
-            _agents[name] = build_worker(name)
-    return _agents[name]
+            _agents[key] = build_worker(name, model)
+    return _agents[key]
 
 
 def _log(run_id: str, kind: str, name: str, task_id: Optional[str] = None, agent: Optional[str] = None, latency_ms: Optional[int] = None, **payload: Any) -> None:
@@ -66,10 +67,12 @@ async def run_agent(agent_name: str, prompt: str, state: dict[str, Any], schema:
     With output_schema set, ADK writes the parsed object to session.state under the
     agent's output_key and never marks a text event 'final' — so we read state, with
     a final-text parse as a fallback."""
-    agent = _agent(agent_name)
+    chain = config.MODEL_CHAINS.get(agent_name) or [None]
     out_key = OUTPUT_KEY[agent_name]
     last_err: Optional[Exception] = None
     for attempt in range(retries + 1):
+        model = chain[min(attempt, len(chain) - 1)]
+        agent = _agent(agent_name, model)
         session_service = InMemorySessionService()
         runner = Runner(agent=agent, app_name=config.APP_NAME, session_service=session_service)
         session = await session_service.create_session(app_name=config.APP_NAME, user_id="fleet", state=dict(state))
@@ -85,7 +88,7 @@ async def run_agent(agent_name: str, prompt: str, state: dict[str, Any], schema:
             latency = int((time.perf_counter() - t0) * 1000)
             done = await session_service.get_session(app_name=config.APP_NAME, user_id="fleet", session_id=session.id)
             payload = done.state.get(out_key) if done else None
-            _log(state.get("run_id", ""), "model", "final_response", task_id=state.get("task_id"), agent=agent_name, latency_ms=latency, via=("state" if payload else "text"))
+            _log(state.get("run_id", ""), "model", "final_response", task_id=state.get("task_id"), agent=agent_name, latency_ms=latency, model=model, via=("state" if payload else "text"))
             if payload:
                 return schema.model_validate(payload)
             if final_text.strip():
@@ -93,7 +96,7 @@ async def run_agent(agent_name: str, prompt: str, state: dict[str, Any], schema:
             raise ValueError(f"{agent_name} produced no structured output")
         except Exception as e:  # noqa: BLE001 — retry on rate limits and transient model errors
             last_err = e
-            _log(state.get("run_id", ""), "model", "error", task_id=state.get("task_id"), agent=agent_name, attempt=attempt, error=str(e)[:400])
+            _log(state.get("run_id", ""), "model", "error", task_id=state.get("task_id"), agent=agent_name, attempt=attempt, model=model, error=str(e)[:400])
             if attempt < retries:
                 await asyncio.sleep(2 * (attempt + 1))
     raise RuntimeError(f"{agent_name} failed after {retries + 1} attempts: {last_err}")

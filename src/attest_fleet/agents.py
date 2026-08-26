@@ -80,10 +80,10 @@ After any change, read the record back (get_customer / get_subscription) and quo
 you checked in evidence."""
 
 
-def build_controller() -> LlmAgent:
+def build_controller(model=None) -> LlmAgent:
     return LlmAgent(
         name="fleet_controller",
-        model=config.CONTROLLER_MODEL,
+        model=model or config.CONTROLLER_MODEL,
         description="Decomposes a support ticket into verifiable tasks.",
         instruction=CONTROLLER_INSTRUCTION,
         tools=list(tools.READ_TOOLS),
@@ -93,7 +93,7 @@ def build_controller() -> LlmAgent:
     )
 
 
-def build_worker(name: str) -> LlmAgent:
+def build_worker(name: str, model=None) -> LlmAgent:
     if name == "billing_agent":
         instr, tls = BILLING_INSTRUCTION, tools.BILLING_TOOLS
     elif name == "account_agent":
@@ -102,7 +102,7 @@ def build_worker(name: str) -> LlmAgent:
         raise ValueError(name)
     return LlmAgent(
         name=name,
-        model=config.WORKER_MODEL,
+        model=model or config.WORKER_MODEL,
         description=f"{name} specialist worker",
         instruction=_worker_instruction(name, instr),
         tools=list(tls),
@@ -114,10 +114,10 @@ def build_worker(name: str) -> LlmAgent:
     )
 
 
-def build_auditor() -> LlmAgent:
+def build_auditor(model=None) -> LlmAgent:
     return LlmAgent(
         name="auditor",
-        model=config.AUDITOR_MODEL,
+        model=model or config.AUDITOR_MODEL,
         description="Verifies a task outcome from evidence when no deterministic check exists.",
         instruction="""You are an independent auditor. You receive a task, the worker's claim and the raw
 tool events. Decide whether the claim's outcome is supported by the evidence. Be skeptical:
