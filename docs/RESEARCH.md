@@ -103,3 +103,35 @@ Independent state verification, deterministic-first detection, pre-execution gat
 end-state correctness, and risk-coverage escalation are, per the 2025–2026 literature, the
 things that actually work on agent reliability. Attest Fleet is a running system that does
 all five, on Gemini 3.5 + ADK + Cloud Run, and **measures** the result.
+
+
+## Where Attest Fleet fits the field (composes, not competes)
+
+The agent-observability field is crowded, but it measures the wrong thing for this failure
+mode. LangSmith, Arize Phoenix, Braintrust, Galileo, W&B Weave, Langfuse, and DeepEval all
+observe the agent's own output: traces, transcripts, or an **LLM-as-judge**. Advani's finding
+above is the point — an LLM judge catches false success at **AUROC ≤ 0.65** (barely above
+chance), because a confident wrong claim reads as success to another model too. Google's own
+tools sit at the edges of the problem, not the center:
+
+| Layer | Google tool | What it checks | The gap |
+|---|---|---|---|
+| Input guard | **Model Armor** | prompt injection, jailbreak, PII, malicious URLs | screens content, not outcomes |
+| Offline eval | **Vertex Gen AI Evaluation** | rubric metrics vs a golden dataset | offline, against references, not the live record |
+| Telemetry | **OpenTelemetry GenAI** | agent / tool / memory spans | records calls; defines no notion of a verified outcome |
+
+**Attest Fleet adds the layer none of them cover: at runtime, in production, does the agent's
+claimed outcome match the live system of record?** It composes on top of the Google stack
+(Model Armor guards the input → ADK agents act on Cloud Run → **Attest verifies against
+Firestore** → OTel / Vertex eval observe), rather than replacing any of it.
+
+**Honest novelty.** Independent state verification is not new in distributed systems — it is
+post-conditions, integration tests, reconciliation, the saga/outbox pattern. The novelty is
+that agent frameworks report success from *self-report*, so the industry dropped the one check
+every other critical system keeps. Attest re-introduces it as a **live, calibrated, per-action
+governance metric** (silent-failure rate + Brier/ECE + escalation threshold + pre-execution
+gates). We did not invent verification; we made it the measurement-and-governance layer for
+agents. No productized competitor was found doing this at 2026-08-26.
+
+_Adjacent 2026 research (detection via trace anomalies, not state verification): Pathak et al.
+arXiv 2511.04032; the NeurIPS 2026 "Who Verifies the Agents?" workshop._

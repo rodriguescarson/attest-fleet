@@ -27,6 +27,22 @@ trigger ──► fleet_controller ──► billing_agent / account_agent ─�
                                  → injected into the worker's next instruction
 ```
 
+## What makes it different
+
+Every agent-observability tool grades the agent on what it **said** (traces, an LLM-judge).
+LLM-judge evaluation catches false success at **AUROC ≤ 0.65** — barely above chance (Advani,
+2606.09863). Attest Fleet grades the agent on what actually **changed in the system of record**,
+and turns the gap into a measured metric. It **composes with the Google stack** rather than
+replacing it: **Model Armor** guards the input, ADK agents act on **Cloud Run**, **Attest
+verifies against Firestore**, and **Vertex Gen AI Eval / OpenTelemetry** observe — none of which
+verify, at runtime, that a claimed outcome is real.
+
+For the Fortified Enterprise Fleet track, the pieces map to the platform vocabulary: the agent
+**identity list** (`/fleet/identities`) is the agent **registry + identity**; **Firestore** is the
+**memory bank** (durable cross-session context and evidence); the **policy gate** (kill switch +
+pre-execution state gate + human approval) is the **agent gateway / guardrails**; and the
+operator **dashboard** is **agent observability** — now measuring correctness, not just traffic.
+
 ## Stack (hackathon gate)
 
 | Requirement | Used |
