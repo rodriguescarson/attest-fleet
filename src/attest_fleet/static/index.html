@@ -313,6 +313,8 @@ button{font-family:inherit; cursor:pointer}
 .why-legend span{display:inline-flex; align-items:center; gap:7px; font-family:var(--mono); font-size:11px; color:var(--muted); letter-spacing:.02em}
 .why-legend i{width:9px; height:9px; border-radius:50%; flex:none}
 @media (max-width:760px){ .why-grid{grid-template-columns:1fr} }
+.why-origin{margin:12px 0 0; font-size:13px; line-height:1.55; color:var(--ink-2); max-width:62ch}
+.why-origin em{color:var(--ink); font-style:normal; font-weight:500; border-bottom:1px dotted var(--line-strong)}
 </style>
 </head>
 <body>
@@ -378,6 +380,7 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
     <div class="why-head">
       <div class="why-eyebrow">Why Attest Fleet exists</div>
       <h2 class="why-lead">Agent platforms score themselves on what they <b>say</b>. Attest scores them on what actually <b>changed</b>.</h2>
+      <p class="why-origin">Built on my own research on agent reliability and silent failure. A paper I have under review is titled <em>Silent Failure in Automated Model Adaptation</em>, and Attest Fleet is that thesis made runnable.</p>
     </div>
     <div class="why-grid">
       <div class="why-cell">
@@ -391,8 +394,8 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
       <div class="why-cell">
         <h3><span class="d" style="background:var(--accent)"></span>Who it benefits</h3>
         <ul class="who-list">
-          <li><b>Enterprises</b> running customer-ops agent fleets across support, billing and fulfillment that touch real money and real accounts.</li>
-          <li><b>Operations teams</b> paged for the failures a green dashboard hid.</li>
+          <li><b>Whoever has to trust a fleet they did not build</b>, and today has no way to know when it is quietly wrong.</li>
+          <li><b>Enterprises</b> running customer-ops fleets that touch real money and real accounts.</li>
           <li><b>Customers</b> who would otherwise be silently wronged: refunds lost, tickets closed unfixed.</li>
           <li><b>Platform and risk teams</b> who need an audit trail and a human gate before high-stakes actions.</li>
         </ul>
