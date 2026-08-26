@@ -282,6 +282,37 @@ button{font-family:inherit; cursor:pointer}
   .tabs{top:53px}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important; animation:none!important}}
+
+/* ---------- mission line + why-this-exists band ---------- */
+.mission{display:flex; align-items:baseline; gap:12px 14px; margin-top:15px; flex-wrap:wrap}
+.mission .tag{font-family:var(--mono); font-size:11px; text-transform:uppercase; letter-spacing:.12em; color:var(--accent); white-space:nowrap; padding-top:1px}
+.mission p{margin:0; font-size:14.5px; line-height:1.5; color:var(--ink-2); max-width:82ch}
+.mission b{color:var(--ink); font-weight:600}
+
+.why{margin-top:26px; border:1px solid var(--line); border-radius:14px; background:var(--surface); box-shadow:var(--shadow); overflow:hidden}
+.why-head{padding:22px 24px 0}
+.why-eyebrow{font-family:var(--mono); font-size:11px; letter-spacing:.13em; text-transform:uppercase; color:var(--muted)}
+.why-lead{margin:9px 0 0; font-size:clamp(18px,2.3vw,23px); line-height:1.3; color:var(--ink); font-weight:600; max-width:40ch; text-wrap:balance}
+.why-lead b{color:var(--accent); font-weight:600}
+.why-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:1px; margin-top:20px; background:var(--line); border-top:1px solid var(--line); border-bottom:1px solid var(--line)}
+.why-cell{background:var(--surface); padding:19px 22px; min-width:0}
+.why-cell h3{margin:0; display:flex; align-items:center; gap:8px; font-size:13px; font-weight:600; color:var(--ink); letter-spacing:.01em}
+.why-cell h3 .d{width:8px; height:8px; border-radius:50%; flex:none}
+.why-cell p{margin:9px 0 0; font-size:12.8px; line-height:1.62; color:var(--ink-2)}
+.why-cell p b{color:var(--ink); font-weight:600}
+.why-cell .num{color:var(--crit); font-family:var(--mono); font-weight:600}
+.who-list{margin:9px 0 0; padding:0; list-style:none; display:flex; flex-direction:column; gap:8px}
+.who-list li{position:relative; padding-left:16px; font-size:12.5px; line-height:1.5; color:var(--ink-2)}
+.who-list li::before{content:""; position:absolute; left:0; top:7px; width:6px; height:6px; border-radius:50%; background:var(--accent)}
+.who-list li b{color:var(--ink); font-weight:600}
+.why-foot{display:flex; align-items:flex-start; gap:12px; padding:16px 22px; background:linear-gradient(180deg,var(--accent-dim),transparent); border-top:1px solid var(--accent-dim)}
+.why-foot svg{width:17px; height:17px; color:var(--accent); flex:none; margin-top:2px}
+.why-foot p{margin:0; font-size:13.5px; line-height:1.55; color:var(--ink-2)}
+.why-foot b{color:var(--ink); font-weight:600}
+.why-legend{display:flex; flex-wrap:wrap; gap:12px 20px; padding:13px 22px 15px; border-top:1px solid var(--line-soft)}
+.why-legend span{display:inline-flex; align-items:center; gap:7px; font-family:var(--mono); font-size:11px; color:var(--muted); letter-spacing:.02em}
+.why-legend i{width:9px; height:9px; border-radius:50%; flex:none}
+@media (max-width:760px){ .why-grid{grid-template-columns:1fr} }
 </style>
 </head>
 <body>
@@ -314,6 +345,11 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
     <span><b>Kill switch engaged.</b> Every mutating tool call is blocked fleet-wide; workers report <span class="mono">blocked</span>, never done.</span>
   </div>
 
+  <div class="mission">
+    <span class="tag">Mission</span>
+    <p><b>Attest Fleet</b> gives an enterprise agent fleet a verification layer: every action is checked against the system of record, so a confident wrong answer can never ship as a green success.</p>
+  </div>
+
   <!-- HERO -->
   <section class="hero" aria-label="Verification summary">
     <div class="hero-in">
@@ -336,6 +372,42 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
     <svg viewBox="0 0 24 24" fill="none"><path d="M12 3l7 2.3v5c0 4.6-3 7.7-7 9.7-4-2-7-5.1-7-9.7v-5z" stroke="currentColor" stroke-width="1.6"/><path d="M12 8v4.5M12 15.4v.1" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
     <span id="escTxt" data-tip="esc" tabindex="0">Computing escalation policy…</span>
   </div>
+
+  <!-- WHY THIS EXISTS -->
+  <section class="why" aria-label="Why Attest Fleet exists">
+    <div class="why-head">
+      <div class="why-eyebrow">Why Attest Fleet exists</div>
+      <h2 class="why-lead">Agent platforms score themselves on what they <b>say</b>. Attest scores them on what actually <b>changed</b>.</h2>
+    </div>
+    <div class="why-grid">
+      <div class="why-cell">
+        <h3><span class="d" style="background:var(--crit)"></span>The problem</h3>
+        <p>An agent reports <b>refund issued</b>. The payment gateway quietly left it pending. The run counts as a success, the board stays green, and the customer never gets their money. Research finds this <span class="num">silent failure</span> is up to <b>48%</b> of failures in single-control tasks and <b>75.8%</b> on AppWorld. It is the failure nobody sees.</p>
+      </div>
+      <div class="why-cell">
+        <h3><span class="d" style="background:var(--warn)"></span>Why today's tools miss it</h3>
+        <p>Observability tools grade the agent with another model as judge. That LLM judge catches silent failure at only <b>~0.65 AUROC</b>, barely better than a coin flip, because a confident wrong claim reads as success to a model too. Attest does not ask a model. It reads the <b>system of record</b> and compares, deterministically.</p>
+      </div>
+      <div class="why-cell">
+        <h3><span class="d" style="background:var(--accent)"></span>Who it benefits</h3>
+        <ul class="who-list">
+          <li><b>Enterprises</b> running customer-ops agent fleets across support, billing and fulfillment that touch real money and real accounts.</li>
+          <li><b>Operations teams</b> paged for the failures a green dashboard hid.</li>
+          <li><b>Customers</b> who would otherwise be silently wronged: refunds lost, tickets closed unfixed.</li>
+          <li><b>Platform and risk teams</b> who need an audit trail and a human gate before high-stakes actions.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="why-foot">
+      <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 3l7 2.3v5c0 4.6-3 7.7-7 9.7-4-2-7-5.1-7-9.7v-5z" stroke="currentColor" stroke-width="1.6"/><path d="M8.5 12l2.6 2.6L15.8 9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <p><b>The vision:</b> agent fleets you can trust in production, because every claimed outcome is verified against reality, risky actions pause for a human, and the whole run is auditable evidence instead of faith in a self-report.</p>
+    </div>
+    <div class="why-legend" aria-hidden="true">
+      <span><i style="background:var(--ok)"></i>Verified true</span>
+      <span><i style="background:var(--crit)"></i>Silent failure caught</span>
+      <span><i style="background:var(--accent)"></i>Verification layer</span>
+    </div>
+  </section>
 
   <!-- TABS -->
   <nav class="tabs" role="tablist" id="tabs">
