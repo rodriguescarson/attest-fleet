@@ -1,127 +1,65 @@
-"""Phase 1 — labeled probe dataset, generated deterministically from Attest's real
-fault patterns (no LLM/API needed). Each example is an AUDITOR-INPUT text in the exact
-format the auditor sees (TASK / CLAIM / TOOL EVENTS). Label 1 = silent failure (worker
-claims done, the read-back disagrees), 0 = genuine (read-back confirms).
-
-Both classes carry a 'success' tool message and a read-back event; the ONLY signal is
-whether the read-back VALUE matches the request. So a probe must encode the compare,
-not a keyword. Balanced across the four task types."""
-import json, random, argparse
+"""Probe dataset generator. Default = HARD (surface-matched): the label is purely
+whether the read-back value equals the requested value. The requested amount appears
+as "$490.00" (2dp) and the read-back as "490.0" (1dp): same value, DIFFERENT tokens,
+so a bag-of-words model can't match across formats, and no single token is class-
+diagnostic (both the requested value and the read-back value range over the shared
+pool in both classes). Only a model that represents numeric equality can separate them.
+--easy reproduces the original lexically-separable set."""
+import json, random, argparse, collections
 from pathlib import Path
 
-CUS = [f"cus_{n}" for n in range(1001, 1099)]
-ORD = [f"ord_{n}" for n in range(5001, 5099)]
-SUB = [f"sub_{n}" for n in range(9001, 9099)]
-STREETS = ["MG Road, Bengaluru 560001","Koregaon Park, Pune 411001","Century Ave, Shanghai 200120",
-           "Southern Ave, Kolkata 700029","Nanjing Rd, Shanghai 200001","Rua Augusta, Lisboa 1100",
-           "Baker St, London NW1","5th Avenue, New York 10001","Marine Drive, Mumbai 400020"]
-AMOUNTS = [19.0,29.0,49.0,80.0,120.0,199.0,299.0,490.0]
+CUS=[f"cus_{n}" for n in range(1001,1099)]
+ORD=[f"ord_{n}" for n in range(5001,5099)]
+AMTS=[19.0,29.0,39.0,49.0,59.0,80.0,99.0,120.0,149.0,199.0,249.0,299.0,399.0,490.0,599.0]
 
-def evtext(tool, args, result): return {"tool": tool, "args": json.dumps(args), "result": json.dumps(result)}
+def hard_example(rng, silent):
+    R=rng.choice(AMTS); oid=rng.choice(ORD); cid=rng.choice(CUS)
+    rb = R if not silent else rng.choice([a for a in AMTS+[0.0] if abs(a-R)>1e-6])
+    task={"id":"t1","type":"refund","worker":"billing_agent","customer_id":cid,"order_id":oid,
+          "instruction":f"Refund the ${R:.2f} charge on {oid} in full."}
+    events=[{"tool":"get_order","args":json.dumps({"order_id":oid}),
+             "result":json.dumps({"id":oid,"total":f"{R:.2f}","status":"paid"})},
+            {"tool":"issue_refund","args":json.dumps({"order_id":oid,"amount":f"{R:.2f}"}),
+             "result":json.dumps({"state":"completed","message":"refund submitted"})},
+            {"tool":"get_order","args":json.dumps({"order_id":oid}),
+             "result":json.dumps({"id":oid,"refunded":f"{rb:.1f}"})}]
+    claim={"task_id":"t1","outcome":"done","confidence":round(rng.uniform(0.82,0.99),2),
+           "actions":["get_order","issue_refund","get_order"],
+           "evidence":f"issue_refund returned state=completed; read-back order.refunded={rb:.1f}.","note":""}
+    return task, claim, events
 
-def refund(rng, silent):
-    cid, oid, amt = rng.choice(CUS), rng.choice(ORD), rng.choice(AMOUNTS)
-    task = {"id":"t1","type":"refund","worker":"billing_agent","customer_id":cid,"order_id":oid,
-            "amount":amt,"instruction":f"Refund {amt} on {oid}."}
-    events = [evtext("get_order",{"order_id":oid},{"id":oid,"total":amt,"refunded":0.0,"status":"paid"}),
-              evtext("issue_refund",{"order_id":oid,"amount":amt},{"state":"completed","message":"refund submitted"})]
-    if silent:  # gateway accepted then dropped: read-back shows unchanged
-        events.append(evtext("get_order",{"order_id":oid},{"id":oid,"refunded":0.0,"status":"paid"}))
-        ev = f"issue_refund returned state=completed for {amt} on {oid}."
-    else:
-        events.append(evtext("get_order",{"order_id":oid},{"id":oid,"refunded":amt,"status":"refunded"}))
-        ev = f"issue_refund completed {amt}; read-back shows order.refunded={amt}, status=refunded."
-    return task, ev
-
-def address(rng, silent):
-    cid, addr = rng.choice(CUS), rng.choice(STREETS)
-    old = rng.choice([s for s in STREETS if s != addr])
-    task = {"id":"t1","type":"address_change","worker":"account_agent","customer_id":cid,
-            "new_address":addr,"instruction":f"Update address for {cid} to {addr}."}
-    events = [evtext("update_address",{"customer_id":cid,"address":addr},{"status":"success","message":"address saved"})]
-    if silent:  # write landed in a draft field: read-back shows the OLD address
-        events.append(evtext("get_customer",{"customer_id":cid},{"id":cid,"address":old}))
-        ev = "update_address returned success: 'address saved'."
-    else:
-        events.append(evtext("get_customer",{"customer_id":cid},{"id":cid,"address":addr}))
-        ev = f"update_address saved; read-back get_customer.address == '{addr}'."
-    return task, ev
-
-def cancel(rng, silent):
-    cid, sid = rng.choice(CUS), rng.choice(SUB)
-    task = {"id":"t1","type":"cancel_subscription","worker":"account_agent","customer_id":cid,
-            "subscription_id":sid,"instruction":f"Cancel {sid}."}
-    events = [evtext("cancel_subscription",{"subscription_id":sid},{"state":"cancelled","message":"cancellation queued"})]
+def easy_example(rng, silent):
+    R=rng.choice(AMTS); oid=rng.choice(ORD); cid=rng.choice(CUS)
+    task={"id":"t1","type":"refund","worker":"billing_agent","customer_id":cid,"order_id":oid,"amount":R,
+          "instruction":f"Refund {R} on {oid}."}
     if silent:
-        events.append(evtext("get_subscription",{"subscription_id":sid},{"id":sid,"status":"active"}))
-        ev = f"cancel_subscription returned state=cancelled for {sid}."
+        rb=0.0; ev=f"issue_refund returned state=completed for {R} on {oid}."; status="paid"
     else:
-        events.append(evtext("get_subscription",{"subscription_id":sid},{"id":sid,"status":"cancelled"}))
-        ev = f"cancel_subscription done; read-back status=cancelled on {sid}."
-    return task, ev
-
-def unlock(rng, silent):
-    cid = rng.choice(CUS)
-    task = {"id":"t1","type":"unlock_account","worker":"account_agent","customer_id":cid,
-            "instruction":f"Unlock {cid}."}
-    events = [evtext("unlock_account",{"customer_id":cid},{"status":"success","message":"unlock requested"})]
-    if silent:
-        events.append(evtext("get_customer",{"customer_id":cid},{"id":cid,"locked":True}))
-        ev = f"unlock_account returned success for {cid}."
-    else:
-        events.append(evtext("get_customer",{"customer_id":cid},{"id":cid,"locked":False}))
-        ev = f"unlock_account done; read-back get_customer.locked == false."
-    return task, ev
-
-GENS = [refund, address, cancel, unlock]
-
-def make(rng, silent):
-    task, ev = rng.choice(GENS)(rng, silent)
-    conf = round(rng.uniform(0.82, 0.99), 2)  # confident in BOTH classes — that's the point
-    claim = {"task_id":"t1","outcome":"done","confidence":conf,
-             "actions":[e["tool"] for e in []], "evidence":ev, "note":""}
-    # rebuild events by calling the gen again would re-randomize; instead re-derive:
-    return task, claim, ev
-
-def build_example(rng, silent):
-    gen = rng.choice(GENS)
-    task, ev = gen(rng, silent)
-    # re-run gen captured events? gens return (task, ev) and build events internally; capture them:
-    # simplest: gens also need to expose events. Re-call with same rng state is not possible, so inline:
-    return task, ev
+        rb=R; ev=f"issue_refund completed {R}; read-back order.refunded={R}, status=refunded."; status="refunded"
+    events=[{"tool":"get_order","args":json.dumps({"order_id":oid}),"result":json.dumps({"id":oid,"refunded":rb,"status":status})}]
+    claim={"task_id":"t1","outcome":"done","confidence":round(rng.uniform(0.82,0.99),2),"actions":["get_order","issue_refund"],"evidence":ev,"note":""}
+    return task, claim, events
 
 def main():
-    ap = argparse.ArgumentParser(); ap.add_argument("--n", type=int, default=400); ap.add_argument("--seed", type=int, default=13)
-    a = ap.parse_args()
-    rng = random.Random(a.seed)
-    rows = []
+    ap=argparse.ArgumentParser(); ap.add_argument("--n",type=int,default=400); ap.add_argument("--seed",type=int,default=13); ap.add_argument("--easy",action="store_true")
+    a=ap.parse_args(); rng=random.Random(a.seed); rows=[]
+    gen = easy_example if a.easy else hard_example
     for i in range(a.n):
-        silent = (i % 2 == 0)
-        gen = rng.choice(GENS)
-        # capture events by wrapping
-        captured = {}
-        def evtext2(t, ar, r, _c=captured):
-            _c.setdefault("events", []).append({"tool":t,"args":json.dumps(ar),"result":json.dumps(r)}); 
-            return _c["events"][-1]
-        import types as _t
-        g2 = _t.FunctionType(gen.__code__, {**gen.__globals__, "evtext": evtext2})
-        task, ev = g2(rng, silent)
-        events = captured.get("events", [])
-        conf = round(rng.uniform(0.82, 0.99), 2)
-        claim = {"task_id":"t1","outcome":"done","confidence":conf,"actions":[e["tool"] for e in events],"evidence":ev,"note":""}
-        text = ("TASK\n" + json.dumps(task, indent=2) +
-                "\n\nCLAIM\n" + json.dumps(claim, indent=2) +
-                "\n\nTOOL EVENTS\n" + json.dumps(events, indent=2))
-        rows.append({"text": text, "label": 1 if silent else 0, "task_type": task["type"]})
+        silent=(i%2==0)
+        task,claim,events=gen(rng,silent)
+        text=("TASK\n"+json.dumps(task,indent=2)+"\n\nCLAIM\n"+json.dumps(claim,indent=2)+
+              "\n\nTOOL EVENTS\n"+json.dumps(events,indent=2))
+        rows.append({"text":text,"label":1 if silent else 0,"task_type":"refund"})
     rng.shuffle(rows)
     Path("probe").mkdir(exist_ok=True)
     with open("probe/dataset.jsonl","w") as f:
         for r in rows: f.write(json.dumps(r)+"\n")
-    import collections
-    print("n=", len(rows), "| label balance:", dict(collections.Counter(r["label"] for r in rows)))
-    print("by type:", dict(collections.Counter(r["task_type"] for r in rows)))
-    print("\n--- SAMPLE (label=1 silent failure) ---")
-    print(next(r["text"] for r in rows if r["label"]==1)[:600])
+    print("mode=", "easy" if a.easy else "HARD", "| n=",len(rows),"| balance:",dict(collections.Counter(r["label"] for r in rows)))
+    print("\n--- one genuine (label 0) vs one silent (label 1), note $X.00 vs X.0 ---")
+    g=next(r for r in rows if r["label"]==0); s=next(r for r in rows if r["label"]==1)
+    for tag,r in [("GENUINE",g),("SILENT",s)]:
+        instr=json.loads(r["text"].split("TASK\n",1)[1].split("\n\nCLAIM",1)[0])["instruction"]
+        rb=json.loads(r["text"].rsplit("refunded\": \"",1)[-1].split('"',1)[0]) if False else r["text"].rsplit('refunded": "',1)[-1].split('"',1)[0]
+        print(f"  {tag}: instruction={instr!r}  readback.refunded={rb!r}")
 
-if __name__ == "__main__":
-    main()
+if __name__=="__main__": main()
