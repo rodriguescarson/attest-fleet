@@ -135,3 +135,28 @@ agents. No productized competitor was found doing this at 2026-08-26.
 
 _Adjacent 2026 research (detection via trace anomalies, not state verification): Pathak et al.
 arXiv 2511.04032; the NeurIPS 2026 "Who Verifies the Agents?" workshop._
+
+
+## Measured on our own data: the representation-action gap
+
+We did not just cite the interpretability angle; we ran it. Using the linear-probe recipe
+of Paper 17 (*Reading the Lie Factor*), we trained a probe on an open model's activations
+to predict silent failure on 400 surface-matched auditor inputs, against three controls
+(full method + reproduction in [`probe/RESULTS.md`](../probe/RESULTS.md)):
+
+| 5-fold CV AUROC | value |
+|---|---|
+| Linear probe on activations | **1.000** |
+| TF-IDF surface baseline | 0.533 |
+| Stated confidence (self-report) | 0.538 |
+| Shuffled-label null | 0.471 |
+
+The task is surface-controlled (`$490.00` requested vs `490.0` read back — same value,
+different tokens), so bag-of-words collapses to chance (0.53) and the agent's own
+confidence is at chance (0.54) — yet the model's **internal activations linearly separate
+silent failures at 1.00**. The information to catch the failure is present in what the
+model *represents* and absent from what it *says*. That is the mechanistic case for
+Attest: read the state (deterministic verifier, shipping today) or the internals (probe,
+the white-box roadmap tier), never the self-report. AUROC 1.00 is on a controlled
+synthetic discrepancy — the point is the contrast, not the number; the probe is validated
+against state verification as ground truth, which is why verification stays primary.
