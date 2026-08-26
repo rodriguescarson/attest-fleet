@@ -315,6 +315,22 @@ button{font-family:inherit; cursor:pointer}
 @media (max-width:760px){ .why-grid{grid-template-columns:1fr} }
 .why-origin{margin:12px 0 0; font-size:13px; line-height:1.55; color:var(--ink-2); max-width:62ch}
 .why-origin em{color:var(--ink); font-style:normal; font-weight:500; border-bottom:1px dotted var(--line-strong)}
+.probe-card{border:1px solid var(--line); border-radius:12px; background:var(--surface); box-shadow:var(--shadow); padding:18px 20px; margin-bottom:22px}
+.probe-head{display:flex; align-items:baseline; justify-content:space-between; gap:12px; flex-wrap:wrap}
+.probe-eyebrow{font-family:var(--mono); font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:var(--muted)}
+.probe-link{font-size:12px; color:var(--accent); font-family:var(--mono)}
+.probe-lead{margin:10px 0 0; font-size:13.5px; line-height:1.55; color:var(--ink-2); max-width:72ch}
+.probe-lead b{color:var(--ink); font-weight:600}
+.probe-bars{display:flex; flex-direction:column; gap:8px; margin-top:14px}
+.pb{display:grid; grid-template-columns:158px 1fr 42px; align-items:center; gap:12px}
+.pb .pl{font-size:12px; color:var(--ink-2)}
+.pb .bar{height:10px}
+.pb .bar>i{transform:none; width:var(--w,0); background:linear-gradient(90deg,color-mix(in srgb,var(--muted) 45%,transparent),var(--muted))}
+.pb .bar.prb>i{background:linear-gradient(90deg,color-mix(in srgb,var(--accent) 55%,transparent),var(--accent))}
+.pb .pv{font-family:var(--mono); font-size:13px; font-weight:600; text-align:right}
+.pb .pv.hi{color:var(--accent)} .pb .pv.lo{color:var(--faint)}
+.probe-foot{margin:12px 0 0; font-size:11.5px; line-height:1.5; color:var(--faint)}
+@media (max-width:760px){ .pb{grid-template-columns:104px 1fr 38px} }
 </style>
 </head>
 <body>
@@ -423,6 +439,20 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
 
   <!-- OVERVIEW -->
   <section class="panel" id="p-overview" role="tabpanel">
+    <div class="probe-card">
+      <div class="probe-head">
+        <span class="probe-eyebrow">Interpretability probe &middot; representation-action gap</span>
+        <a class="probe-link" href="https://github.com/rodriguescarson/attest-fleet/blob/main/probe/RESULTS.md" target="_blank" rel="noopener">method + reproduction &rarr;</a>
+      </div>
+      <p class="probe-lead">On a surface-matched task, the agent's <b>stated confidence</b> cannot tell a silent failure from a success &mdash; but a linear probe on the model's <b>internal activations</b> can. The signal is in what the model represents, not what it says.</p>
+      <div class="probe-bars">
+        <div class="pb"><span class="pl">Probe on activations</span><span class="bar prb"><i style="--w:100%"></i></span><span class="pv hi">1.00</span></div>
+        <div class="pb"><span class="pl">TF-IDF surface text</span><span class="bar"><i style="--w:53%"></i></span><span class="pv">0.53</span></div>
+        <div class="pb"><span class="pl">Stated confidence</span><span class="bar"><i style="--w:54%"></i></span><span class="pv">0.54</span></div>
+        <div class="pb"><span class="pl">Shuffled-label null</span><span class="bar"><i style="--w:47%"></i></span><span class="pv lo">0.47</span></div>
+      </div>
+      <p class="probe-foot">AUROC, 5-fold CV &middot; Qwen-2.5-1.5B &middot; label = does the read-back equal the request. A controlled result: the contrast is the point, not the 1.00. State verification stays ground truth; the probe is the white-box roadmap tier.</p>
+    </div>
     <div style="display:flex; align-items:baseline; justify-content:space-between; margin-bottom:12px">
       <h2 style="font-size:14px; color:var(--ink-2); font-family:var(--mono); text-transform:uppercase; letter-spacing:.08em; font-weight:500">Recent runs</h2>
       <button class="btn btn-sm" data-goto="runs">View all</button>

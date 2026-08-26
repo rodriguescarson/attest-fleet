@@ -98,7 +98,8 @@ async def run_agent(agent_name: str, prompt: str, state: dict[str, Any], schema:
             last_err = e
             _log(state.get("run_id", ""), "model", "error", task_id=state.get("task_id"), agent=agent_name, attempt=attempt, model=model, error=str(e)[:400])
             if attempt < retries:
-                await asyncio.sleep(2 * (attempt + 1))
+                switching = chain[min(attempt + 1, len(chain) - 1)] != model
+                await asyncio.sleep(0.4 if switching else 1.5 * (attempt + 1))
     raise RuntimeError(f"{agent_name} failed after {retries + 1} attempts: {last_err}")
 
 
