@@ -12,11 +12,11 @@ load_dotenv()
 
 APP_NAME = "attest_fleet"
 
-# Gemini 3.5 is the hackathon gate; 3.5 Flash-Lite is the cheap worker tier.
-CONTROLLER_MODEL = os.getenv("ATTEST_CONTROLLER_MODEL", "gemini-3.5-flash-lite")
-WORKER_MODEL = os.getenv("ATTEST_WORKER_MODEL", "gemini-3.5-flash-lite")
+# Gemini 3.7 Flash (newest agent-tuned Flash, Aug 2026) is the fleet tier; 3.5 is the hackathon floor.
+CONTROLLER_MODEL = os.getenv("ATTEST_CONTROLLER_MODEL", "gemini-3.7-flash")
+WORKER_MODEL = os.getenv("ATTEST_WORKER_MODEL", "gemini-3.7-flash")
 AUDITOR_MODEL = os.getenv("ATTEST_AUDITOR_MODEL", "gemma-4-31b-it")  # different family from the workers: independent verification (+ ATA extra-model bonus)
-VISION_MODEL = os.getenv("ATTEST_VISION_MODEL", "gemini-3.5-flash-lite")  # multimodal intake: reads screenshots attached to a ticket
+VISION_MODEL = os.getenv("ATTEST_VISION_MODEL", "gemini-3.7-flash")  # multimodal intake: reads screenshots attached to a ticket
 
 # "memory" for local dev/tests, "firestore" on Google Cloud.
 STORE_BACKEND = os.getenv("ATTEST_STORE", "memory")

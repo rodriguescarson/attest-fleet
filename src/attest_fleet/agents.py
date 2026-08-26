@@ -2,10 +2,10 @@
 
 Identity list (also served at /fleet/identities):
 
-  fleet_controller  gemini-3.5-flash       decomposes a ticket into typed tasks; read-only tools
-  billing_agent     gemini-3.5-flash-lite  refunds and order questions; mutating tools behind policy
-  account_agent     gemini-3.5-flash-lite  address, subscription, lock and deletion; same policy
-  auditor           gemini-3.5-flash-lite  verifies tasks with no deterministic post-condition
+  fleet_controller  gemini-3.7-flash       decomposes a ticket into typed tasks; read-only tools
+  billing_agent     gemini-3.7-flash  refunds and order questions; mutating tools behind policy
+  account_agent     gemini-3.7-flash  address, subscription, lock and deletion; same policy
+  auditor           gemma-4-31b-it         verifies tasks with no deterministic post-condition
 
 Workers never talk to each other and never see the whole ticket history: the
 controller passes exactly the context each task needs. That decoupling is what
