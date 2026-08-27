@@ -190,6 +190,21 @@ def resume() -> dict:
     return {"kill_switch": False}
 
 
+@app.post("/admin/seed", include_in_schema=False)
+def admin_seed(token: str = "") -> dict:
+    """Reset the board to the curated demo runs. Token-guarded; demo project only."""
+    expected = os.getenv("ATTEST_ADMIN_TOKEN")
+    if not expected or token != expected:
+        raise HTTPException(403, "forbidden")
+    from .store import reset_evidence
+    from .demo import seed_demo
+    store = get_store()
+    reset_evidence(store)
+    seed(store, force=True)
+    seed_demo(store, force=True)
+    return {"ok": True, "runs": store.count("runs"), "approvals": store.count("approvals"), "playbook": store.count("playbook")}
+
+
 @app.get("/fleet/identities")
 def identities() -> list[dict]:
     return AGENT_IDENTITIES

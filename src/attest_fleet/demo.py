@@ -27,10 +27,10 @@ def _run(store: BaseStore, rid, subject, ref, status, task, claim, verif, events
         store.set("events", ev.id, ev.model_dump())
 
 
-def seed_demo(store: BaseStore) -> None:
-    if store.backend != "memory":  # never touch a real database
+def seed_demo(store: BaseStore, force: bool = False) -> None:
+    if store.backend != "memory" and not force:  # never touch a real DB unless explicitly forced (demo project only)
         return
-    if store.get("runs", "run_demo1"):
+    if not force and store.get("runs", "run_demo1"):
         return
 
     # 1 — verified refund
