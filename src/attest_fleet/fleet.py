@@ -19,7 +19,7 @@ from google.adk.sessions import InMemorySessionService
 from google.genai import types
 from pydantic import BaseModel
 
-from . import config, experience
+from . import config, experience, policy
 from .agents import build_auditor, build_controller, build_worker
 from .domain import AuditVerdict, Claim, Event, Plan, RunRecord, Task, TaskResult, Ticket, Verification, now_iso
 from .store import get_store
@@ -80,11 +80,21 @@ async def run_agent(agent_name: str, prompt: str, state: dict[str, Any], schema:
         t0 = time.perf_counter()
         final_text = ""
         try:
-            async for event in runner.run_async(user_id="fleet", session_id=session.id, new_message=content):
-                if event.content and event.content.parts:
-                    text = "".join(p.text or "" for p in event.content.parts if getattr(p, "text", None))
-                    if text:
-                        final_text = text
+
+            async def _drain() -> str:
+                seen = ""
+                async for event in runner.run_async(user_id="fleet", session_id=session.id, new_message=content):
+                    if event.content and event.content.parts:
+                        text = "".join(p.text or "" for p in event.content.parts if getattr(p, "text", None))
+                        if text:
+                            seen = text
+                return seen
+
+            # Wall-clock containment: an agent that neither finishes nor raises (a tool
+            # loop, a stalled stream) is cut off here rather than running until the Cloud
+            # Run request timeout. The timeout is an exception like any other, so the
+            # retry-and-model-fallback path below handles it.
+            final_text = await asyncio.wait_for(_drain(), timeout=config.AGENT_TURN_TIMEOUT_S)
             latency = int((time.perf_counter() - t0) * 1000)
             done = await session_service.get_session(app_name=config.APP_NAME, user_id="fleet", session_id=session.id)
             payload = done.state.get(out_key) if done else None
@@ -159,6 +169,7 @@ async def run_ticket(ticket: Ticket) -> RunRecord:
         pairs: list[tuple[Claim, Verification]] = []
         for task in plan.tasks:
             state = {"run_id": run.id, "ticket_id": ticket.id, "task_id": task.id}
+            policy.reset_tool_budget(run.id, task.id)  # fresh loop-containment budget per task
             claim: Optional[Claim] = None
             try:
                 claim = await run_agent(task.worker, _task_prompt(task), state, Claim)

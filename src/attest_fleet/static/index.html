@@ -334,14 +334,7 @@ button{font-family:inherit; cursor:pointer}
 </style>
 </head>
 <body>
-<!--
-THESIS: An agent fleet's real defect is the gap between what it claims and what it did; the console leads with that gap and the silent-failure rate, refusing the tidy all-green ops dashboard.
-OWN-WORLD: Control-room dark. Near-black blue-green ground, cyan signal accent, Hanken Grotesk with JetBrains Mono for data, semantic green/amber/red for verified/pending/silent-failure, one restrained crimson glow behind the hero.
-STORY: An operator opens to the lie-gap, scans runs, drills into where a silent failure was caught, then gates or kills a risky action.
-FIRST VIEWPORT: Sticky control bar, then a two-part hero (huge silent-failure number left, reported-vs-verified bars right) over a metric strip and the escalation policy; tabs below.
-FORM: Observability control room (user-pinned direction).
-FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, and DESIGN.md
--->
+<!-- Attest Fleet operator console. Leads with the reported-vs-verified gap, not an all-green dashboard. -->
 <div class="shell">
   <header class="topbar">
     <div class="brand">
@@ -410,10 +403,10 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
       <div class="why-cell">
         <h3><span class="d" style="background:var(--accent)"></span>Who it benefits</h3>
         <ul class="who-list">
-          <li><b>Whoever has to trust a fleet they did not build</b>, and today has no way to know when it is quietly wrong.</li>
-          <li><b>Enterprises</b> running customer-ops fleets that touch real money and real accounts.</li>
+          <li><b>The night-shift support lead</b> who inherits a fleet she did not build and cannot read the code of. At 2am the board says every ticket closed green. She is the one a customer calls when it did not. Attest gives her the one thing she never had: a list of the runs that lied, before the complaints arrive.</li>
+          <li><b>The solo operator at a small lender or clinic</b> who bought agents from a vendor, has no ML team, and is personally accountable for every refund and record change.</li>
           <li><b>Customers</b> who would otherwise be silently wronged: refunds lost, tickets closed unfixed.</li>
-          <li><b>Platform and risk teams</b> who need an audit trail and a human gate before high-stakes actions.</li>
+          <li><b>Auditors and risk teams</b> who need evidence a claimed outcome actually happened, not a log saying an agent said so.</li>
         </ul>
       </div>
     </div>
@@ -520,7 +513,10 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
 
 <script>
 const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>[...r.querySelectorAll(s)];
-const api=(p,o)=>fetch(p,o).then(r=>r.ok?r.json():Promise.reject(r));
+// Mutating calls carry the operator token; reads are open. The deployed demo
+// injects a published token so judges can drive the console (see README).
+const OP_TOKEN=(window.__ATTEST_TOKEN__||"");
+const api=(p,o)=>{o=o||{};if(OP_TOKEN&&(o.method||"GET").toUpperCase()!=="GET"){o.headers=Object.assign({},o.headers,{"X-Attest-Token":OP_TOKEN});}return fetch(p,o).then(r=>r.ok?r.json():Promise.reject(r));};
 const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const pct=v=>v==null?"–":(v*100).toFixed(1)+"%";
 const num=v=>v==null?"–":v;

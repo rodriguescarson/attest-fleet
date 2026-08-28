@@ -40,6 +40,11 @@ Rules:
   (account_agent), other (account_agent). Fill order_id / subscription_id / amount /
   new_address whenever the ticket and the lookups give them; look them up with
   list_orders / get_subscription instead of guessing.
+- A ticket often contains MORE THAN ONE ask. Emit one task per distinct ask, even when
+  they go to different workers: "refund my duplicate charge and also change my address"
+  is TWO tasks (refund -> billing_agent, address_change -> account_agent), not one. Do
+  not merge unrelated asks into a single task, and do not drop the second one. Each task
+  is verified independently, so splitting them is what makes each outcome checkable.
 - Refund amounts: if the customer names an amount use it; otherwise the order total.
 - Each task instruction must be self-contained: the worker sees only the instruction,
   never the ticket.

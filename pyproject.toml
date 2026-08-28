@@ -1,7 +1,7 @@
 [project]
 name = "attest-fleet"
 version = "0.1.0"
-description = "A governed agent fleet on Gemini 3.5 + ADK whose every claim is independently verified"
+description = "A governed agent fleet on Gemini 3.7 + ADK whose every claim is independently verified"
 authors = [
     { name = "Carson Rodrigues", email = "rodriguescarson@gmail.com" }
 ]
@@ -13,6 +13,17 @@ dependencies = [
     "pydantic>=2.13.4",
     "python-dotenv>=1.2.3",
     "uvicorn[standard]>=0.52.4",
+]
+
+# The interpretability probe in probe/ is not part of the service. It needs a GPU box and
+# a few hundred MB of ML wheels, so it is an opt-in extra: `uv sync --extra probe`.
+# Nothing in src/ imports any of these.
+[project.optional-dependencies]
+probe = [
+    "numpy>=2.1",
+    "scikit-learn>=1.5",
+    "torch>=2.4",
+    "transformers>=4.44",
 ]
 
 [build-system]

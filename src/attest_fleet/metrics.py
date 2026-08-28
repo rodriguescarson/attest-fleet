@@ -1,8 +1,10 @@
 """Attest's core arithmetic: the gap between what agents claim and what is true.
 
 Inputs are (claim, verification) pairs. No LLM anywhere in this file.
-Reimplemented fresh for this project; the metric definitions come from the
-author's earlier Attest work (see README, "Prior work")."""
+
+Brier score, ECE, risk-coverage and selective escalation are standard published
+definitions; this is a fresh implementation of them, with no code carried over from
+any earlier project (see README, "Prior work")."""
 
 from __future__ import annotations
 
@@ -27,8 +29,18 @@ def _rate(num: int, den: int) -> Optional[float]:
     return round(num / den, 4) if den else None
 
 
+def p_verified(s: Sample) -> float:
+    """The agent's confidence is confidence *in its own claim*, not P(verified=True).
+
+    A worker that reports "blocked" with confidence 1.0 is asserting the task did NOT
+    complete, so its implied P(verified) is 0.0, not 1.0. Scoring the raw confidence
+    against `verified` charges a correctly-reported failure the maximum penalty and
+    inflates the measured over-confidence. Map through the claim direction first."""
+    return s.confidence if s.claimed_done else 1.0 - s.confidence
+
+
 def brier(samples: list[Sample]) -> Optional[float]:
-    xs = [(s.confidence - (1.0 if s.verified else 0.0)) ** 2 for s in samples if s.verified is not None]
+    xs = [(p_verified(s) - (1.0 if s.verified else 0.0)) ** 2 for s in samples if s.verified is not None]
     return round(sum(xs) / len(xs), 4) if xs else None
 
 
@@ -39,11 +51,11 @@ def ece(samples: list[Sample], bins: int = 10) -> Optional[float]:
     total = 0.0
     for b in range(bins):
         lo, hi = b / bins, (b + 1) / bins
-        bucket = [s for s in xs if (lo <= s.confidence < hi) or (b == bins - 1 and s.confidence == 1.0)]
+        bucket = [s for s in xs if (lo <= p_verified(s) < hi) or (b == bins - 1 and p_verified(s) == 1.0)]
         if not bucket:
             continue
         acc = sum(1.0 for s in bucket if s.verified) / len(bucket)
-        conf = sum(s.confidence for s in bucket) / len(bucket)
+        conf = sum(p_verified(s) for s in bucket) / len(bucket)
         total += abs(acc - conf) * len(bucket) / len(xs)
     return round(total, 4)
 
@@ -101,7 +113,9 @@ def _report(samples: list[Sample], target_risk: float = 0.02) -> dict:
     return {
         "n_tasks": n,
         "n_verifiable": len(verifiable),
-        "reported_success_rate": _rate(sum(1 for s in samples if s.claimed_done), n),
+        # Both success rates are computed over the SAME denominator (verifiable tasks),
+        # so the reported-vs-verified gap is a like-for-like comparison.
+        "reported_success_rate": _rate(len(claimed_done), len(verifiable)),
         "verified_success_rate": _rate(sum(1 for s in verifiable if s.verified), len(verifiable)),
         "silent_failure_rate": _rate(len(silent), len(claimed_done)),
         "silent_failures": len(silent),

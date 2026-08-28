@@ -1,0 +1,31 @@
+# The Dockerfile does `COPY . .`, so anything not listed here lands in the image.
+# Secrets and local build junk must never be baked into a Cloud Run revision.
+
+# Credentials
+.env
+.env.*
+
+# Local virtualenv (~141MB, and built for the host platform, not the image)
+.venv
+
+# VCS and CI metadata
+.git
+.github
+.gitignore
+.dockerignore
+
+# Python build/test artefacts
+__pycache__
+*.pyc
+*.pyo
+.pytest_cache
+.ruff_cache
+*.egg-info
+
+# Not needed at runtime
+evidence
+probe
+scripts
+tests
+docs
+.impeccable

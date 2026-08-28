@@ -8,7 +8,17 @@ fit an L2 logistic **linear probe**; report 5-fold cross-validated AUROC against
 controls: a shuffled-label null, a **TF-IDF surface baseline**, and the worker's own
 **stated confidence**. Model: `Qwen/Qwen2.5-1.5B-Instruct` (open; the Paper-17 family).
 A one-line `MODEL_ID` swap runs it on Gemma (Attest's auditor) with an HF token.
-Reproduce: `python probe/gen_dataset.py && python probe/run_probe.py`.
+
+**Reproduce.** The probe is not part of the service and its dependencies (`torch`,
+`transformers`, `scikit-learn`, `numpy`) are not installed by a normal `uv sync`. They live
+in the `probe` extra, and `run_probe.py` asks for `device_map="cuda"`, so this needs a GPU
+box:
+
+```bash
+uv sync --extra probe
+uv run python probe/gen_dataset.py
+uv run python probe/run_probe.py        # writes probe/result.json
+```
 
 ## Two datasets, and why the second is the honest one
 
@@ -50,6 +60,14 @@ representation-action gap: the mechanistic root of silent failure.
 - AUROC 1.00 is on a **controlled synthetic** discrepancy, not a production rate; real
   silent failures are messier. The point is the **contrast** (probe 1.00 vs confidence 0.54
   vs surface 0.53), not the perfection.
+- **The 1.00 is a best-of-layers number, and the null does not get the same advantage.**
+  `run_probe.py` scores all 29 layers with the same 5-fold cross-validated AUROC it then
+  reports, and keeps the highest, so the headline carries the optimism of that selection.
+  The shuffled-label null is computed only at the layer already chosen that way, never over
+  a fresh sweep of its own. A like-for-like comparison would nest the layer choice inside
+  the outer folds, or repeat the full sweep on shuffled labels. Neither was done here, so
+  read the layer-5 result as an upper bound on the probe and the null as a floor check on
+  the fitting procedure, not as two numbers from the same protocol.
 - The probe is validated **against state verification as ground truth** — i.e., the world
   labels the probe, which is why state verification stays primary and the probe is a
   complementary tier, never a replacement.
