@@ -30,9 +30,40 @@ def _chain(*models: str) -> list:
             seen.add(m); out.append(m)
     return out
 
-CONTROLLER_CHAIN = _chain(CONTROLLER_MODEL, "gemini-3.6-flash", "gemini-3.5-flash-lite")
-WORKER_CHAIN = _chain(WORKER_MODEL, "gemini-3.6-flash", "gemini-3.5-flash-lite")
-VISION_CHAIN = _chain(VISION_MODEL, "gemini-3.6-flash", "gemini-3.5-flash-lite")
+# --- Backend routing ----------------------------------------------------------
+# Gemini roles run on VERTEX AI, billed to the project, so the fleet is not capped by the
+# Gemini Developer API free tier. Gemma is not served as a Vertex publisher model, so the
+# auditor keeps the Developer API key. That is not a workaround: it means the auditor
+# reaches its model through a different BACKEND as well as a different model FAMILY, which
+# is exactly the independence an auditor is supposed to have.
+USE_VERTEX = os.getenv("ATTEST_USE_VERTEX", "1") == "1"
+VERTEX_PROJECT = os.getenv("GOOGLE_CLOUD_PROJECT", "")
+VERTEX_LOCATION = os.getenv("ATTEST_VERTEX_LOCATION", "global")  # 3.7/3.6 are global-only today
+REGISTRY_LOCATION = os.getenv("ATTEST_REGISTRY_LOCATION", "global")  # Agent Registry catalog
+
+# Model Armor: inline guardrail screening untrusted ticket text for prompt injection.
+MODEL_ARMOR_TEMPLATE = os.getenv("ATTEST_MODEL_ARMOR_TEMPLATE", "attest-ticket-guard")
+MODEL_ARMOR_LOCATION = os.getenv("ATTEST_MODEL_ARMOR_LOCATION", "asia-south1")
+
+
+def on_vertex(model: str) -> bool:
+    """Gemma is Developer-API only; everything else goes to Vertex when it is configured."""
+    return USE_VERTEX and bool(VERTEX_PROJECT) and not (model or "").startswith("gemma")
+
+
+def client_kwargs_for(model: str) -> dict:
+    if on_vertex(model):
+        return {"vertexai": True, "project": VERTEX_PROJECT, "location": VERTEX_LOCATION}
+    return {"api_key": os.getenv("GOOGLE_API_KEY", "")}
+
+
+# The last rung differs by backend: 3.5-flash-lite exists on the Developer API,
+# 3.5-flash is the equivalent floor on Vertex.
+_FLOOR = "gemini-3.5-flash" if (USE_VERTEX and VERTEX_PROJECT) else "gemini-3.5-flash-lite"
+
+CONTROLLER_CHAIN = _chain(CONTROLLER_MODEL, "gemini-3.6-flash", _FLOOR)
+WORKER_CHAIN = _chain(WORKER_MODEL, "gemini-3.6-flash", _FLOOR)
+VISION_CHAIN = _chain(VISION_MODEL, "gemini-3.6-flash", _FLOOR)
 AUDITOR_CHAIN = _chain(AUDITOR_MODEL, "gemma-4-26b-a4b-it")
 
 MODEL_CHAINS = {

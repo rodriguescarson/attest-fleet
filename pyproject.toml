@@ -10,6 +10,7 @@ dependencies = [
     "fastapi>=0.141.1",
     "google-adk>=2.7.1",
     "google-cloud-firestore>=2.29.0",
+    "opentelemetry-exporter-otlp-proto-http>=1.42.1",
     "pydantic>=2.13.4",
     "python-dotenv>=1.2.3",
     "uvicorn[standard]>=0.52.4",

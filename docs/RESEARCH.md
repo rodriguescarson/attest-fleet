@@ -36,6 +36,22 @@ post-conditions first** (`verifier.py`), using the LLM auditor only where no det
 check exists — exactly the ordering the AUROC numbers argue for. The dashboard's headline
 "silent-failure rate" is this paper's central metric, measured live.
 
+**What we measure.** Over a 40-ticket sweep at a 30% injected tool-fault rate on
+`gemini-3.7-flash` (Vertex AI), the silent-failure rate is **0.0476**: one of 21 claimed-done
+tasks was false. An earlier 5-pair sweep on `gemini-3.5-flash-lite` put it at **0.25**. The
+useful reading is not either number on its own but the fact that they differ by a factor of
+five: the rate is a property of the model, the tooling and the workload, so it has to be
+measured on the system you are actually running, and re-measured when the model under it
+changes. It did not reach zero on the stronger model either.
+
+**Where post-condition verification falls short.** The same sweep scores the verifier against
+hidden ground truth and reports **2 blind spots in 40 runs**, both on a deliberately ambiguous
+ticket: two customers share a name, the controller picks one, the write lands, and the
+post-condition ("is the address now the requested value?") passes because it checks that the
+action happened rather than that the right entity was chosen. Post-conditions verify actions;
+identity resolution needs a check of its own. Reporting that is part of the method, not a
+footnote to it.
+
 ### 2. Gate risky actions *before* they run, deterministically
 
 **Reddy, Challaram, Basu, "Reason Less, Verify More: Deterministic Gates Recover a Silent
@@ -69,7 +85,12 @@ catches gateway/draft-write silent failures after the fact.
 
 **How Attest implements it.** Attest computes **Brier and ECE over whole runs**, pairing
 each worker's self-reported confidence with the independent verdict, and reports the
-reliability curve — not a single-turn score. The evidence trail (per-run tool events) is
+reliability curve — not a single-turn score. On the 40-run sweep that is **Brier 0.023, ECE
+0.0328**: on this model and workload the claim confidence is well calibrated and usable as a
+routing signal. An earlier build of this repo reported the opposite and called the agents badly
+over-confident; that was a sign-mapping bug in the metric (confidence is confidence in the
+agent's *own claim*, so it must be mapped through the claim direction before scoring), and the
+over-confidence reading did not survive the fix. The evidence trail (per-run tool events) is
 the trajectory-level signal this paper argues calibration must use. _Roadmap:_ fold
 process features (read-back performed? tool error seen?) into the confidence estimate.
 
@@ -86,7 +107,10 @@ Conditions"** — arXiv [2601.06112](https://arxiv.org/abs/2601.06112).
 record**, never by matching the agent's text. The eval harness (`scripts/simulate.py`)
 **injects tool faults** (a gateway that accepts a refund then goes silent, an address write
 that lands in a draft field) — the λ dimension — and scores the verifier against hidden
-ground truth. _Roadmap:_ add pass^k consistency and ε-perturbation runs to the harness.
+ground truth. At λ = 0.3, 11 of 40 runs ended `failed`: the fault made the task genuinely
+impossible, the worker said so, and the verifier confirmed it against the store, which is why
+the false-alarm rate is 0.00. Honest failure under injected faults is the expected reading of
+that row, not a broken fleet. _Roadmap:_ add pass^k consistency and ε-perturbation runs to the harness.
 
 ### 5. Escalate on a measured risk-coverage guarantee
 
@@ -100,7 +124,10 @@ Human Agreement"** — ICLR 2025, arXiv [2407.18370](https://arxiv.org/abs/2407.
 (fallback) Gemma auditor → **human escalation**. The **escalation threshold** the dashboard
 reports *is* the selective-prediction operating point — it picks the lowest confidence at
 which the residual silent-failure rate stays under target, and states the coverage bought.
-The human-approval gate is the escalation destination for high-risk actions.
+On the 40-run sweep, against a target residual risk of 0.02, that point is **0.98: 95.2%
+coverage at 0% residual silent-failure risk**, so 20 of 21 done claims auto-accept and the
+rest go to a human. The human-approval gate is the escalation destination for high-risk
+actions.
 
 ---
 
@@ -109,7 +136,9 @@ The human-approval gate is the escalation destination for high-risk actions.
 Independent state verification, deterministic-first detection, pre-execution gates,
 end-state correctness, and risk-coverage escalation are, per the 2025–2026 literature, the
 things that actually work on agent reliability. Attest Fleet is a running system that does
-all five, on Gemini 3.7 + ADK + Cloud Run, and **measures** the result.
+all five, on Gemini 3.7 (Vertex AI) + ADK + Cloud Run, and **measures** the result: 40 runs at
+a 30% injected fault rate, silent-failure rate 0.0476, Brier 0.023, ECE 0.0328, 2 verifier
+blind spots reported alongside.
 
 
 ## Where Attest Fleet fits the field (composes, not competes)
@@ -128,9 +157,11 @@ tools sit at the edges of the problem, not the center:
 | Telemetry | **OpenTelemetry GenAI** | agent / tool / memory spans | records calls; defines no notion of a verified outcome |
 
 **Attest Fleet adds the layer none of them cover: at runtime, in production, does the agent's
-claimed outcome match the live system of record?** It composes on top of the Google stack
-(Model Armor guards the input → ADK agents act on Cloud Run → **Attest verifies against
-Firestore** → OTel / Vertex eval observe), rather than replacing any of it.
+claimed outcome match the live system of record?** It sits on top of the Google stack rather
+than replacing any of it, and most of that stack is wired in rather than cited: Model Armor
+screens the ticket text at ingress (`guard.py`, fail-open, every decision logged) → ADK agents
+act on Cloud Run with Gemini on Vertex AI → **Attest verifies against Firestore** → ADK's OTel
+GenAI spans export to Cloud Trace.
 
 **Honest novelty.** Independent state verification is not new in distributed systems — it is
 post-conditions, integration tests, reconciliation, the saga/outbox pattern. The novelty is
