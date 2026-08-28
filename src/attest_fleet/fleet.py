@@ -19,7 +19,7 @@ from google.adk.sessions import InMemorySessionService
 from google.genai import types
 from pydantic import BaseModel
 
-from . import config, experience, policy
+from . import config, experience, guard, policy
 from .agents import build_auditor, build_controller, build_worker
 from .domain import AuditVerdict, Claim, Event, Plan, RunRecord, Task, TaskResult, Ticket, Verification, now_iso
 from .store import get_store
@@ -148,6 +148,14 @@ async def run_ticket(ticket: Ticket) -> RunRecord:
     _log(run.id, "run", "started", ticket_id=ticket.id)
     agent_ticket = ticket.model_copy(update={"expected": None})  # ground truth never reaches an agent
     try:
+        # Model Armor screens the untrusted ticket text before any agent sees it.
+        verdict = guard.screen(f"{ticket.subject}\n\n{ticket.body}")
+        _log(run.id, "policy", "model_armor", ticket_id=ticket.id, **verdict)
+        if verdict["blocked"]:
+            run.status = "failed"
+            run.error = f"blocked by Model Armor: {verdict['reason']} ({verdict.get('confidence')})"
+            store.set("runs", run.id, run.model_dump())
+            return run
         if store.get_setting("kill_switch", False):
             run.status = "killed"
             run.error = "kill switch engaged"

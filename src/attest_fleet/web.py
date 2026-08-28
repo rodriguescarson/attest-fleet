@@ -26,8 +26,29 @@ from .fleet import run_ticket
 from .store import get_store, seed
 
 
+def _setup_tracing() -> None:
+    """Export ADK's OpenTelemetry GenAI spans to Cloud Trace.
+
+    ADK already emits reasoning-chain spans under the OTel GenAI semantic conventions;
+    this just points them at the project so the agent trail is inspectable in Cloud Trace
+    alongside the evidence store. Best-effort: tracing must never keep the fleet down."""
+    if os.getenv("ATTEST_TRACING", "1") != "1" or not config.VERTEX_PROJECT:
+        return
+    try:
+        from google.adk.telemetry.google_cloud import get_gcp_exporters
+        from google.adk.telemetry.setup import maybe_set_otel_providers
+
+        os.environ.setdefault("OTEL_SERVICE_NAME", "attest-fleet")
+        os.environ.setdefault("GOOGLE_CLOUD_PROJECT", config.VERTEX_PROJECT)
+        maybe_set_otel_providers([get_gcp_exporters(enable_cloud_tracing=True)])
+        print("tracing: exporting OTel GenAI spans to Cloud Trace")
+    except Exception as e:  # noqa: BLE001
+        print("tracing not enabled:", e)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    _setup_tracing()
     seed(get_store())
     if os.getenv("ATTEST_DEMO") == "1":
         from .demo import seed_demo
@@ -242,8 +263,14 @@ def admin_seed(token: str = "") -> dict:
 
 
 @app.get("/fleet/identities")
-def identities() -> list[dict]:
-    return AGENT_IDENTITIES
+def fleet_identities() -> dict:
+    """The agent registry view. Read live from Google's Agent Registry when it answers,
+    with the in-code identity list as the fallback and as the source of deployment facts
+    (model, whether the agent mutates) that the registry does not carry."""
+    from .registry import registered_agents
+
+    agents, source = registered_agents()
+    return {"source": source, "count": len(agents), "agents": agents}
 
 
 @app.get("/fleet/playbook")

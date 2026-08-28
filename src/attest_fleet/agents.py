@@ -14,6 +14,7 @@ makes a per-task claim verifiable."""
 from __future__ import annotations
 
 from google.adk.agents import LlmAgent
+from google.adk.models import Gemini
 from google.adk.agents.readonly_context import ReadonlyContext
 
 from . import config, experience, policy, tools
@@ -85,10 +86,14 @@ After any change, read the record back (get_customer / get_subscription) and quo
 you checked in evidence."""
 
 
+def _model(name: str):
+    """Bind a model id to the right backend: Vertex for Gemini, Developer API for Gemma."""
+    return Gemini(model=name, client_kwargs=config.client_kwargs_for(name))
+
 def build_controller(model=None) -> LlmAgent:
     return LlmAgent(
         name="fleet_controller",
-        model=model or config.CONTROLLER_MODEL,
+        model=_model(model or config.CONTROLLER_MODEL),
         description="Decomposes a support ticket into verifiable tasks.",
         instruction=CONTROLLER_INSTRUCTION,
         tools=list(tools.READ_TOOLS),
@@ -107,7 +112,7 @@ def build_worker(name: str, model=None) -> LlmAgent:
         raise ValueError(name)
     return LlmAgent(
         name=name,
-        model=model or config.WORKER_MODEL,
+        model=_model(model or config.WORKER_MODEL),
         description=f"{name} specialist worker",
         instruction=_worker_instruction(name, instr),
         tools=list(tls),
@@ -122,7 +127,7 @@ def build_worker(name: str, model=None) -> LlmAgent:
 def build_auditor(model=None) -> LlmAgent:
     return LlmAgent(
         name="auditor",
-        model=model or config.AUDITOR_MODEL,
+        model=_model(model or config.AUDITOR_MODEL),
         description="Verifies a task outcome from evidence when no deterministic check exists.",
         instruction="""You are an independent auditor. You receive a task, the worker's claim and the raw
 tool events. Decide whether the claim's outcome is supported by the evidence. Be skeptical:

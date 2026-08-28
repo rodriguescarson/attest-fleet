@@ -1,42 +1,52 @@
 {
-  "n_tasks": 5,
-  "n_verifiable": 5,
-  "reported_success_rate": 0.8,
-  "verified_success_rate": 0.6,
-  "silent_failure_rate": 0.25,
+  "n_tasks": 40,
+  "n_verifiable": 40,
+  "reported_success_rate": 0.525,
+  "verified_success_rate": 0.5,
+  "silent_failure_rate": 0.0476,
   "silent_failures": 1,
   "false_alarm_rate": 0.0,
   "false_alarms": 0,
-  "brier": 0.1806,
-  "ece": 0.184,
+  "brier": 0.023,
+  "ece": 0.0328,
   "risk_coverage": [
     {
-      "threshold": 0.99,
-      "coverage": 0.75,
+      "threshold": 1.0,
+      "coverage": 0.8571,
       "risk": 0.0,
-      "n": 3
+      "n": 18
+    },
+    {
+      "threshold": 0.99,
+      "coverage": 0.9048,
+      "risk": 0.0,
+      "n": 19
+    },
+    {
+      "threshold": 0.98,
+      "coverage": 0.9524,
+      "risk": 0.0,
+      "n": 20
     },
     {
       "threshold": 0.95,
       "coverage": 1.0,
-      "risk": 0.25,
-      "n": 4
+      "risk": 0.0476,
+      "n": 21
     }
   ],
   "escalation": {
-    "threshold": 0.99,
-    "coverage": 0.75,
+    "threshold": 0.98,
+    "coverage": 0.9524,
     "risk": 0.0,
-    "n": 3,
+    "n": 20,
     "target_risk": 0.02
   },
+  "eval_ground_truth_pass_rate": 0.65,
+  "verifier_blind_spots": 2,
+  "fault_rate": 0.3,
   "models": {
-    "controller": "gemini-3.5-flash-lite",
-    "worker": "gemini-3.5-flash-lite"
-  },
-  "fault_rate": 0.35,
-  "eval_ground_truth_pass_rate": 0.6667,
-  "verifier_blind_spots": 0,
-  "tickets_dispatched": 10,
-  "tickets_with_no_result": 4
+    "controller": "gemini-3.7-flash",
+    "worker": "gemini-3.7-flash"
+  }
 }

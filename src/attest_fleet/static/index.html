@@ -331,6 +331,9 @@ button{font-family:inherit; cursor:pointer}
 .pb .pv.hi{color:var(--accent)} .pb .pv.lo{color:var(--faint)}
 .probe-foot{margin:12px 0 0; font-size:11.5px; line-height:1.5; color:var(--faint)}
 @media (max-width:760px){ .pb{grid-template-columns:104px 1fr 38px} }
+.regsrc{font-family:"JetBrains Mono",monospace;font-size:12px;padding:8px 12px;border-radius:8px;margin:0 0 12px;border:1px solid var(--line)}
+.regsrc.ok{color:var(--ok);border-color:color-mix(in srgb,var(--ok) 40%,transparent);background:color-mix(in srgb,var(--ok) 8%,transparent)}
+.regsrc.warn{color:var(--ink-2)}
 </style>
 </head>
 <body>
@@ -483,7 +486,8 @@ button{font-family:inherit; cursor:pointer}
 
   <!-- FLEET -->
   <section class="panel" id="p-fleet" role="tabpanel" hidden>
-    <div class="cards" id="fleetCards"></div>
+    <div class="regsrc" id="fleetSrc"></div>
+      <div class="cards" id="fleetCards"></div>
   </section>
 
   <!-- PLAYBOOK -->
@@ -492,7 +496,7 @@ button{font-family:inherit; cursor:pointer}
   </section>
 
   <footer class="foot">
-    <span class="mono">Attest Fleet · Gemini 3.5 + ADK + Cloud Run + Firestore</span>
+    <span class="mono">Attest Fleet · Gemini 3.7 + Gemma + ADK + Vertex AI + Cloud Run + Firestore</span>
     <span class="spacer" style="flex:1"></span>
     <a href="/docs">API docs</a><a href="/metrics">/metrics</a><a href="/fleet/identities">/identities</a>
   </footer>
@@ -543,7 +547,7 @@ function exampleFor(path){
   const [pt,qs]=path.split("?"); const q=new URLSearchParams(qs||"");
   if(pt==="/health") return {ok:true,store:"example",kill_switch:false,models:{controller:"gemini-3.7-flash",worker:"gemini-3.7-flash"}};
   if(pt==="/metrics") return EXAMPLE.metrics;
-  if(pt==="/fleet/identities") return EXAMPLE.identities;
+  if(pt==="/fleet/identities") return {source:"local", count:(EXAMPLE.identities||[]).length, agents:EXAMPLE.identities};
   if(pt==="/fleet/playbook") return EXAMPLE.playbook;
   if(pt==="/approvals"){const st=q.get("status"); return st?EXAMPLE.approvals.filter(a=>a.status===st):EXAMPLE.approvals;}
   if(pt.startsWith("/runs/")) return EXAMPLE.details[pt.slice(6)];
@@ -694,11 +698,20 @@ $("#apprCards").onclick=async e=>{
 /* fleet */
 async function loadFleet(){
   const box=$("#fleetCards"); box.innerHTML='<div class="sk" style="height:150px"></div>'.repeat(4);
-  let d; try{d=await DATA("/fleet/identities")}catch(e){d=[]}
+  let r; try{r=await DATA("/fleet/identities")}catch(e){r=null}
+  const d = Array.isArray(r) ? r : ((r&&r.agents)||[]);
+  const src = (r&&r.source)||"local";
+  const banner = $("#fleetSrc");
+  if(banner){
+    banner.textContent = src==="agent-registry"
+      ? "Published to Google Agent Registry — this list is read back live from the registry"
+      : "Registry unavailable; showing the in-code identity list";
+    banner.className = "regsrc " + (src==="agent-registry" ? "ok" : "warn");
+  }
   box.innerHTML=d.map(a=>`<div class="card idcard"><div class="card-h"><span class="who mono" style="color:var(--ink);font-size:13px">${esc(a.name)}</span><span class="tag ${a.mutates?'warn':'mut'}">${a.mutates?'mutating':'read-only'}</span></div>
     <div class="role">${esc(a.role)}</div>
     <div class="tools">${(a.tools||[]).map(t=>`<span>${esc(t)}</span>`).join("")||'<span style="opacity:.5">no tools</span>'}</div>
-    <div class="meta"><span>model <b>${esc((a.model||"").replace("gemini-",""))}</b></span>${(a.collaborates_with||[]).length?`<span>↔ <b>${a.collaborates_with.map(esc).join(", ")}</b></span>`:""}</div></div>`).join("");
+    <div class="meta"><span>model <b>${esc((a.model||"").replace("gemini-",""))}</b></span>${(a.collaborates_with||[]).length?`<span>↔ <b>${a.collaborates_with.map(esc).join(", ")}</b></span>`:""}${a.registered?`<span title="${esc((a.registry&&a.registry.agent_id)||"")}">registry <b>${esc((a.registry&&a.registry.version)||"1.0.0")}</b> · ${((a.registry&&a.registry.skills)||[]).length} skills</span>`:""}</div></div>`).join("");
 }
 
 /* playbook */

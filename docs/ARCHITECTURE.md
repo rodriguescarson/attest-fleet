@@ -6,11 +6,13 @@
 flowchart TB
     subgraph trigger [1 · Trigger]
         WH[Webhook / Pub/Sub push] -->|POST /tickets| API[FastAPI on Cloud Run]
+        API --> ARMOR{Model Armor<br/>prompt injection / jailbreak}
+        ARMOR -->|MATCH_FOUND| DROP[ticket blocked before any agent<br/>logged as a model_armor event]
     end
 
-    API --> CTRL
+    ARMOR -->|clean, or guard unreachable: fail open| CTRL
 
-    subgraph plane [Agent fleet · Gemini 3.7 + ADK]
+    subgraph plane [Agent fleet · Gemini 3.7 on Vertex AI + ADK]
         CTRL[fleet_controller<br/>gemini-3.7-flash<br/>2 · decompose + resolve customer]
         CTRL -->|3 · one Task each, isolated context| BILL[billing_agent<br/>refunds, orders]
         CTRL -->|3 · one Task each| ACCT[account_agent<br/>address, cancel, unlock, delete]
@@ -63,11 +65,20 @@ flowchart TB
   fleet executes real mutations against a system of record, and high-risk actions are gated and
   reversible. No chat box anywhere.
 - **Provable (30% Demo/Production-Readiness).** Every tool call is captured as evidence; the verifier
-  produces a measured silent-failure rate; the dashboard shows it live on Cloud Run.
+  produces a measured silent-failure rate; the dashboard shows it live on Cloud Run. ADK's
+  OpenTelemetry GenAI spans export to Cloud Trace, so the reasoning trail and the outcome
+  evidence can be read side by side.
 
-## Agent identity list
+## Agent registry and identities
 
-Served live at `GET /fleet/identities`.
+Served live at `GET /fleet/identities`, which is a read from Google's **Agent Registry**, not a
+hardcoded manifest. `scripts/register_agents.py` publishes each agent as an A2A agent card, one
+registry service each, with every tool indexed as a skill and tagged mutating or read-only. The
+endpoint returns `{"source": "agent-registry", "count": 5, "agents": [...]}` with a per-agent
+`registry` block, and falls back to the in-code list (`"source": "local"`) when the registry is
+unreachable, so tests and local runs need no cloud access. The table below is that in-code
+fallback, which also supplies the deployment facts the registry does not carry: the resolved
+model, and whether the agent mutates.
 
 | Agent | Model | Capability boundary | Mutates | Collaborates with |
 |---|---|---|---|---|
@@ -86,12 +97,27 @@ launch and a 503 must not lose a ticket:
 
 | Role | Cascade |
 |---|---|
-| `fleet_controller`, `billing_agent`, `account_agent`, `vision_reader` | `gemini-3.7-flash` → `gemini-3.6-flash` → `gemini-3.5-flash-lite` |
+| `fleet_controller`, `billing_agent`, `account_agent`, `vision_reader` | `gemini-3.7-flash` → `gemini-3.6-flash` → `gemini-3.5-flash` |
 | `auditor` | `gemma-4-31b-it` → `gemma-4-26b-a4b-it` |
+
+The bottom rung is `gemini-3.5-flash` because Vertex does not serve `-lite`; on a Gemini
+Developer API key the floor is `gemini-3.5-flash-lite` instead, and `config.py` selects the
+right one for the active backend.
 
 The Gemini roles degrade within the Gemini family; the auditor degrades within the Gemma
 family so that it stays a different model family from the workers and keeps the
 independence that makes its verdict worth anything. The chains are defined in
 `src/attest_fleet/config.py` and the resolved selection is served at `GET /health`.
+
+## Backends: Vertex AI for Gemini, the Developer API for Gemma
+
+The Gemini roles run on **Vertex AI** (location `global`, which is where 3.7 and 3.6 are
+served), billed to the project, so the fleet is not capped by the Developer API free tier.
+Gemma is not a Vertex publisher model, so the auditor keeps a Gemini Developer API key. That
+split is worth more than it costs: the auditor now reaches its model through a different
+**backend** as well as a different model **family**, which is a stronger form of the
+independence its verdict depends on. `config.on_vertex()` makes the routing decision per model
+id and `config.client_kwargs_for()` builds the matching client, so a single env flag
+(`ATTEST_USE_VERTEX=0`) routes every role back through one Developer API key.
 
 The failure-mode table is in the [README](../README.md#failure-mode-table).
