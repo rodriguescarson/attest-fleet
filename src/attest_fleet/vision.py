@@ -9,6 +9,9 @@ from __future__ import annotations
 import asyncio
 import base64
 import os
+import ipaddress
+import socket
+import urllib.parse
 import urllib.request
 
 from google import genai
@@ -26,15 +29,42 @@ def _client_():
     return _client
 
 
+MAX_IMAGE_BYTES = 8 * 1024 * 1024
+
+
+def _assert_fetchable(url: str) -> None:
+    """A ticket attachment is attacker-controlled input: the ticket endpoint accepts any
+    URL, and this service runs on Cloud Run next to a metadata server. Restrict fetches to
+    public http(s) hosts so a ticket cannot make the fleet read link-local or private
+    addresses (169.254.169.254 and friends)."""
+    parsed = urllib.parse.urlparse(url)
+    if parsed.scheme not in ("http", "https"):
+        raise ValueError(f"unsupported attachment scheme {parsed.scheme!r}")
+    host = parsed.hostname or ""
+    if not host:
+        raise ValueError("attachment url has no host")
+    try:
+        infos = socket.getaddrinfo(host, parsed.port or (443 if parsed.scheme == "https" else 80), proto=socket.IPPROTO_TCP)
+    except socket.gaierror as e:
+        raise ValueError(f"cannot resolve attachment host {host!r}") from e
+    for info in infos:
+        ip = ipaddress.ip_address(info[4][0])
+        if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved or ip.is_multicast:
+            raise ValueError(f"attachment host {host!r} resolves to non-public address {ip}")
+
+
 def _load_image(url: str) -> tuple[bytes, str]:
     if url.startswith("data:"):
         head, b64 = url.split(",", 1)
         mime = head[5:].split(";")[0] or "image/png"
         return base64.b64decode(b64), mime
+    _assert_fetchable(url)
     req = urllib.request.Request(url, headers={"User-Agent": "attest-fleet/0.1"})
-    with urllib.request.urlopen(req, timeout=15) as r:  # noqa: S310 — operator-supplied ticket attachment
-        data = r.read()
+    with urllib.request.urlopen(req, timeout=15) as r:  # noqa: S310 — validated by _assert_fetchable
+        data = r.read(MAX_IMAGE_BYTES + 1)
         mime = (r.headers.get("Content-Type") or "image/png").split(";")[0]
+    if len(data) > MAX_IMAGE_BYTES:
+        raise ValueError(f"attachment exceeds {MAX_IMAGE_BYTES} bytes")
     return data, mime
 
 

@@ -1,0 +1,42 @@
+{
+  "n_tasks": 5,
+  "n_verifiable": 5,
+  "reported_success_rate": 0.8,
+  "verified_success_rate": 0.6,
+  "silent_failure_rate": 0.25,
+  "silent_failures": 1,
+  "false_alarm_rate": 0.0,
+  "false_alarms": 0,
+  "brier": 0.1806,
+  "ece": 0.184,
+  "risk_coverage": [
+    {
+      "threshold": 0.99,
+      "coverage": 0.75,
+      "risk": 0.0,
+      "n": 3
+    },
+    {
+      "threshold": 0.95,
+      "coverage": 1.0,
+      "risk": 0.25,
+      "n": 4
+    }
+  ],
+  "escalation": {
+    "threshold": 0.99,
+    "coverage": 0.75,
+    "risk": 0.0,
+    "n": 3,
+    "target_risk": 0.02
+  },
+  "models": {
+    "controller": "gemini-3.5-flash-lite",
+    "worker": "gemini-3.5-flash-lite"
+  },
+  "fault_rate": 0.35,
+  "eval_ground_truth_pass_rate": 0.6667,
+  "verifier_blind_spots": 0,
+  "tickets_dispatched": 10,
+  "tickets_with_no_result": 4
+}

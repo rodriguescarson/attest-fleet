@@ -58,6 +58,13 @@ FAULT_RATE = float(os.getenv("ATTEST_FAULT_RATE", "0"))
 # silent-failure rate is at or below this target.
 TARGET_RESIDUAL_RISK = float(os.getenv("ATTEST_TARGET_RESIDUAL_RISK", "0.02"))
 
+# Loop containment. A worker that never raises is otherwise bounded only by the Cloud Run
+# request timeout, so a runaway agent is capped two ways: a wall-clock budget per model
+# turn, and a hard ceiling on tool calls per task enforced at the same gate that enforces
+# policy. Both fail closed and leave an evidence event.
+AGENT_TURN_TIMEOUT_S = float(os.getenv("ATTEST_AGENT_TURN_TIMEOUT_S", "90"))
+MAX_TOOL_CALLS_PER_TASK = int(os.getenv("ATTEST_MAX_TOOL_CALLS_PER_TASK", "12"))
+
 # Lessons injected into worker instructions from past verified failures.
 PLAYBOOK_LESSONS = int(os.getenv("ATTEST_PLAYBOOK_LESSONS", "5"))
 

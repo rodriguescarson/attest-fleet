@@ -11,11 +11,12 @@ import base64
 import html
 import json
 import os
+import secrets
 from pathlib import Path
 from contextlib import asynccontextmanager
 from typing import Any, Optional
 
-from fastapi import BackgroundTasks, FastAPI, HTTPException, Request
+from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 
 from . import config, metrics
@@ -36,6 +37,41 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Attest Fleet", version="0.1.0", lifespan=lifespan)
 
+
+# ------------------------------------------------------------------ operator boundary
+
+OPERATOR_TOKEN = os.getenv("ATTEST_OPERATOR_TOKEN", "")
+
+
+def require_operator(request: Request) -> None:
+    """Guard every state-changing endpoint.
+
+    A fleet whose kill switch and approval gate are world-writable has no governance at
+    all, so mutation is separated from inspection: reads (runs, metrics, evidence,
+    identities) stay open for auditability, writes require the operator token.
+
+    Unset token = local development, everything allowed. In production the token is set
+    on Cloud Run. A rejected call is written to the evidence trail like any other
+    policy decision, so an attempted unauthorised mutation is visible to the operator.
+    """
+    if not OPERATOR_TOKEN:
+        return
+    supplied = request.headers.get("x-attest-token") or request.query_params.get("token") or ""
+    if not secrets.compare_digest(supplied, OPERATOR_TOKEN):
+        try:
+            from .policy import record_event
+
+            record_event(
+                run_id="fleet",
+                kind="policy",
+                name="auth_denied",
+                args_json=json.dumps({"path": request.url.path, "method": request.method}),
+                result_json=json.dumps({"reason": "missing or invalid operator token"}),
+            )
+        except Exception:  # noqa: BLE001 - never let audit logging block the 403
+            pass
+        raise HTTPException(403, "operator token required for state-changing calls")
+
 if config.ADK_UI:
     try:  # the ADK developer UI, mounted for local demos
         import os
@@ -51,7 +87,7 @@ if config.ADK_UI:
 # ------------------------------------------------------------------ triggers
 
 
-@app.post("/tickets", status_code=202)
+@app.post("/tickets", status_code=202, dependencies=[Depends(require_operator)])
 async def create_ticket(request: Request, background: BackgroundTasks) -> dict:
     """Enterprise trigger. Accepts a Ticket JSON body, or a Pub/Sub push envelope
     whose message.data is a base64 Ticket JSON."""
@@ -66,7 +102,7 @@ async def create_ticket(request: Request, background: BackgroundTasks) -> dict:
     return {"accepted": True, "ticket_id": ticket.id}
 
 
-@app.post("/tickets/batch", status_code=202)
+@app.post("/tickets/batch", status_code=202, dependencies=[Depends(require_operator)])
 async def create_tickets_batch(request: Request, background: BackgroundTasks) -> dict:
     """Async batch trigger: enqueue many tickets at once; they process in the
     background and stream onto the dashboard. Accepts {"tickets": [...]} or a bare list."""
@@ -154,7 +190,7 @@ def list_approvals(status: Optional[str] = None) -> list[dict]:
     return rows
 
 
-@app.post("/approvals/{approval_id}/{decision}")
+@app.post("/approvals/{approval_id}/{decision}", dependencies=[Depends(require_operator)])
 def decide_approval(approval_id: str, decision: str, decided_by: str = "operator") -> dict:
     if decision not in ("approve", "reject"):
         raise HTTPException(400, "decision must be approve|reject")
@@ -166,7 +202,7 @@ def decide_approval(approval_id: str, decision: str, decided_by: str = "operator
     return store.get("approvals", approval_id)
 
 
-@app.post("/approvals/{approval_id}/{decision}/rerun", status_code=202)
+@app.post("/approvals/{approval_id}/{decision}/rerun", status_code=202, dependencies=[Depends(require_operator)])
 async def decide_and_rerun(approval_id: str, decision: str, background: BackgroundTasks) -> dict:
     """Approve (or reject) and re-run the originating ticket so the fleet finishes the job."""
     a = decide_approval(approval_id, decision)
@@ -178,13 +214,13 @@ async def decide_and_rerun(approval_id: str, decision: str, background: Backgrou
     return {"approval": a, "rerun_ticket_id": ticket.id}
 
 
-@app.post("/fleet/kill")
+@app.post("/fleet/kill", dependencies=[Depends(require_operator)])
 def kill() -> dict:
     get_store().set_setting("kill_switch", True)
     return {"kill_switch": True}
 
 
-@app.post("/fleet/resume")
+@app.post("/fleet/resume", dependencies=[Depends(require_operator)])
 def resume() -> dict:
     get_store().set_setting("kill_switch", False)
     return {"kill_switch": False}
@@ -234,4 +270,14 @@ _STATIC = os.path.join(os.path.dirname(__file__), "static")
 
 @app.get("/", response_class=HTMLResponse, include_in_schema=False)
 def dashboard() -> HTMLResponse:
-    return HTMLResponse(Path(os.path.join(_STATIC, "index.html")).read_text(encoding="utf-8"))
+    page = Path(os.path.join(_STATIC, "index.html")).read_text(encoding="utf-8")
+    # The console is the operator's own client, so it is handed the token. This is a
+    # published demo credential (see README): the point it demonstrates is that the
+    # boundary is enforced server-side, not that this particular token is a secret.
+    if OPERATOR_TOKEN:
+        page = page.replace(
+            "</head>",
+            f"<script>window.__ATTEST_TOKEN__={json.dumps(OPERATOR_TOKEN)};</script></head>",
+            1,
+        )
+    return HTMLResponse(page)

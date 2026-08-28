@@ -10,8 +10,8 @@ flowchart TB
 
     API --> CTRL
 
-    subgraph plane [Agent fleet · Gemini 3.5 + ADK]
-        CTRL[fleet_controller<br/>gemini-3.5-flash-lite<br/>2 · decompose + resolve customer]
+    subgraph plane [Agent fleet · Gemini 3.7 + ADK]
+        CTRL[fleet_controller<br/>gemini-3.7-flash<br/>2 · decompose + resolve customer]
         CTRL -->|3 · one Task each, isolated context| BILL[billing_agent<br/>refunds, orders]
         CTRL -->|3 · one Task each| ACCT[account_agent<br/>address, cancel, unlock, delete]
     end
@@ -39,7 +39,7 @@ flowchart TB
         VER[verifier<br/>reads post-conditions from the store<br/>NOT the agent's self-report]
         VER --> SF{claim = done<br/>but world disagrees?}
         SF -->|yes| SILENT[silent failure]
-        VER -.->|no deterministic check| AUD[auditor<br/>gemini-3.5-flash-lite]
+        VER -.->|no deterministic check| AUD[auditor<br/>gemma-4-31b-it]
     end
 
     SILENT --> EXP
@@ -71,11 +71,27 @@ Served live at `GET /fleet/identities`.
 
 | Agent | Model | Capability boundary | Mutates | Collaborates with |
 |---|---|---|---|---|
-| `fleet_controller` | gemini-3.5-flash-lite | Decompose ticket, resolve customer (read-only tools) | no | billing_agent, account_agent |
-| `billing_agent` | gemini-3.5-flash-lite | Refunds, order reads | yes (gated) | fleet_controller |
-| `account_agent` | gemini-3.5-flash-lite | Address, cancel, unlock, delete | yes (gated) | fleet_controller |
-| `vision_reader` | gemini-3.5-flash-lite | Read an image attached to a ticket (screenshot, receipt, photo) into text | no | fleet_controller |
+| `fleet_controller` | gemini-3.7-flash | Decompose ticket, resolve customer (read-only tools) | no | billing_agent, account_agent |
+| `billing_agent` | gemini-3.7-flash | Refunds, order reads | yes (gated) | fleet_controller |
+| `account_agent` | gemini-3.7-flash | Address, cancel, unlock, delete | yes (gated) | fleet_controller |
+| `vision_reader` | gemini-3.7-flash | Read an image attached to a ticket (screenshot, receipt, photo) into text | no | fleet_controller |
 | `auditor` | **gemma-4-31b-it** | Verify tasks with no deterministic post-condition — a different model family, so it doesn't share the workers' blind spots | no | — |
 
-The controller model is env-configurable (`ATTEST_CONTROLLER_MODEL`); it moves to `gemini-3.5-flash`
-once demand-shed 503s clear. The failure-mode table is in the [README](../README.md#failure-mode-table).
+## Model tiers and the fallback cascade
+
+Every model id is env-configurable (`ATTEST_CONTROLLER_MODEL`, `ATTEST_WORKER_MODEL`,
+`ATTEST_VISION_MODEL`, `ATTEST_AUDITOR_MODEL`) and each role runs a cascade rather than a
+single model, because a newly released Flash tier is demand-shed (HTTP 503) for weeks after
+launch and a 503 must not lose a ticket:
+
+| Role | Cascade |
+|---|---|
+| `fleet_controller`, `billing_agent`, `account_agent`, `vision_reader` | `gemini-3.7-flash` → `gemini-3.6-flash` → `gemini-3.5-flash-lite` |
+| `auditor` | `gemma-4-31b-it` → `gemma-4-26b-a4b-it` |
+
+The Gemini roles degrade within the Gemini family; the auditor degrades within the Gemma
+family so that it stays a different model family from the workers and keeps the
+independence that makes its verdict worth anything. The chains are defined in
+`src/attest_fleet/config.py` and the resolved selection is served at `GET /health`.
+
+The failure-mode table is in the [README](../README.md#failure-mode-table).

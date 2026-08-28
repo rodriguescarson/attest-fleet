@@ -74,6 +74,14 @@ def record_event(**kw: Any) -> Event:
 
 _t0: dict[str, float] = {}
 
+# Tool-call counters keyed by "run_id:task_id" for the loop-containment budget.
+_tool_calls: dict[str, int] = {}
+
+
+def reset_tool_budget(run_id: str, task_id: str = "") -> None:
+    """Clear the loop-containment counter for a task (called when a task starts)."""
+    _tool_calls.pop(f"{run_id}:{task_id}", None)
+
 
 def before_tool(tool, args: dict[str, Any], tool_context) -> Optional[dict]:
     store = get_store()
@@ -86,6 +94,19 @@ def before_tool(tool, args: dict[str, Any], tool_context) -> Optional[dict]:
     # Tools that mutate take the run id so fault injection is reproducible per run.
     if tool.name in MUTATING and "run_id" in getattr(tool, "func", lambda: None).__code__.co_varnames if hasattr(tool, "func") else False:
         args["run_id"] = run_id
+
+    # Loop containment. Counted across EVERY tool, not just mutating ones: the runaway
+    # case the rubric asks about is a worker that spins on reads and never concludes.
+    # The budget is per task, so a legitimately multi-step task is unaffected.
+    budget_key = f"{run_id}:{task_id or ''}"
+    _tool_calls[budget_key] = _tool_calls.get(budget_key, 0) + 1
+    if _tool_calls[budget_key] > config.MAX_TOOL_CALLS_PER_TASK:
+        record_event(run_id=run_id, task_id=task_id, agent=agent, kind="policy", name="loop_guard",
+                     args_json=json.dumps({"tool": tool.name, "calls": _tool_calls[budget_key],
+                                           "budget": config.MAX_TOOL_CALLS_PER_TASK}, default=str))
+        return {"status": "blocked",
+                "reason": f"tool-call budget of {config.MAX_TOOL_CALLS_PER_TASK} exhausted for this task",
+                "instruction": "You are looping. Stop calling tools. Report outcome='failed' with this reason. Do not claim the task is done."}
 
     if tool.name in MUTATING and store.get_setting("kill_switch", False):
         record_event(run_id=run_id, task_id=task_id, agent=agent, kind="policy", name="kill_switch_block",

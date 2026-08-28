@@ -35,7 +35,10 @@ def test_metrics_known_values():
     assert m["verified_success_rate"] == 0.75
     assert m["silent_failure_rate"] == pytest.approx(1 / 3, abs=1e-3)
     assert m["false_alarm_rate"] == 1.0
-    assert m["brier"] == pytest.approx(((0.1) ** 2 + (0.8) ** 2 + (0.8) ** 2 + 0) / 4, abs=1e-4)
+    # Confidence is confidence in the CLAIM, so it maps to P(verified) through the claim
+    # direction: "done"@0.9 -> 0.9, but "failed"@0.2 -> 0.8 (only 20% sure it failed).
+    # a: (0.9-1)^2  b: (0.8-0)^2  c: (0.8-1)^2  d: (1.0-1)^2
+    assert m["brier"] == pytest.approx((0.01 + 0.64 + 0.04 + 0.0) / 4, abs=1e-4)
     # threshold 0.9 accepts a,d (both right) -> risk 0, coverage 2/3
     assert m["escalation"]["threshold"] == 0.9 and m["escalation"]["coverage"] == pytest.approx(2 / 3, abs=1e-3)
 
@@ -130,3 +133,32 @@ def test_batch_audit_records():
     assert rep["n_tasks"] == 4 and rep["n_verifiable"] == 3
     assert rep["silent_failure_rate"] == 0.5   # 1 of 2 verifiable claimed-done
     assert rep["false_alarm_rate"] == 1.0
+
+
+def test_brier_does_not_penalise_a_correctly_reported_block():
+    """Regression: a worker that correctly reports it did NOT complete, with high
+    confidence, must score near-zero error — not the maximum penalty. Scoring raw
+    confidence against `verified` inverted this and inflated measured over-confidence."""
+    pairs = [
+        (claim("t", "blocked", 1.0), Verification(task_id="t", verified=False, method="postcondition")),
+    ]
+    m = metrics.compute(pairs)
+    assert m["brier"] == pytest.approx(0.0, abs=1e-9)
+    assert m["ece"] == pytest.approx(0.0, abs=1e-9)
+
+
+def test_loop_guard_stops_a_runaway_worker(store):
+    """The rubric asks how the system recovers if a worker loops. A per-task tool-call
+    budget is enforced at the same gate as policy, and fails closed with evidence."""
+    from attest_fleet import config
+    tool = SimpleNamespace(name="get_order")
+    ctx = _ctx(run_id="loop-run", ticket_id="tk", task_id="t-loop")
+    policy.reset_tool_budget("loop-run", "t-loop")
+    for _ in range(config.MAX_TOOL_CALLS_PER_TASK):
+        assert policy.before_tool(tool, {"order_id": "ord_5001"}, ctx) is None
+    blocked = policy.before_tool(tool, {"order_id": "ord_5001"}, ctx)
+    assert blocked["status"] == "blocked" and "budget" in blocked["reason"]
+    assert any(e["name"] == "loop_guard" for e in store.list("events", limit=200))
+    # a different task gets its own budget
+    policy.reset_tool_budget("loop-run", "t-other")
+    assert policy.before_tool(tool, {"order_id": "ord_5001"}, _ctx(run_id="loop-run", ticket_id="tk", task_id="t-other")) is None
