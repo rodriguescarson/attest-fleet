@@ -65,10 +65,16 @@ def registered_agents() -> tuple[list[dict], str]:
     by_name: dict[str, dict] = {}
     source = "local"
     try:
+        fleet_names = {i["name"] for i in AGENT_IDENTITIES}
         for a in _fetch() or []:
-            name = a.get("displayName")
-            if name:
-                by_name[name] = a
+            # The registry derives an Agent's displayName from the agent card's `name`
+            # ("billing_agent"), not from the Service displayName we set ("Attest Fleet ·
+            # billing_agent"). Match on either, so a change to the service label on one
+            # side cannot silently drop every agent to registered=false.
+            label = a.get("displayName") or ""
+            hit = next((n for n in fleet_names if label == n or label.endswith(n)), None)
+            if hit:
+                by_name[hit] = a
         if by_name:
             source = "agent-registry"
     except Exception:  # noqa: BLE001 - the registry is an enrichment, never a hard dependency

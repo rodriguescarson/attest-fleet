@@ -66,3 +66,19 @@ def test_empty_text_is_not_screened(monkeypatch):
     monkeypatch.setattr(guard.config, "MODEL_ARMOR_TEMPLATE", "t")
     monkeypatch.setattr(guard.config, "VERTEX_PROJECT", "p")
     assert guard.screen("   ")["checked"] is False
+
+
+def test_registry_matches_either_display_name_form(monkeypatch):
+    """The registry labels a derived Agent with the card's `name` ("billing_agent"), while
+    the Service we create is labelled "Attest Fleet · billing_agent". Both must match, so a
+    label change on either side cannot silently mark the whole fleet unregistered."""
+    for label in ("billing_agent", "Attest Fleet · billing_agent"):
+        monkeypatch.setattr(registry, "_cache", {"at": 0.0, "agents": None, "source": "local"})
+        monkeypatch.setattr(registry, "_fetch", lambda label=label: [
+            {"name": "projects/p/locations/global/agents/x", "displayName": label,
+             "agentId": "urn:agent:test", "version": "1.0.0",
+             "skills": [{"id": "issue_refund"}], "protocols": [{"type": "A2A_AGENT"}]}
+        ])
+        agents, source = registry.registered_agents()
+        assert source == "agent-registry", label
+        assert next(a for a in agents if a["name"] == "billing_agent")["registered"] is True, label
