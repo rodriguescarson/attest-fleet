@@ -158,7 +158,7 @@ Firestore); the same runs sit behind the **Example data** toggle on the hosted d
 `uv run pytest -q` is the credential-free correctness check: metrics arithmetic, verifier
 post-conditions and the policy gate, with no model in the loop.
 
-### Path B: drive the real fleet (needs a Gemini key)
+### Path B: drive the real fleet (needs a GCP project, or just a Gemini key)
 
 ```bash
 cp .env.example .env
@@ -168,7 +168,7 @@ cp .env.example .env
 uv run uvicorn attest_fleet.web:app --reload --port 8080
 ```
 
-Send a trigger (this one calls Gemini, so it needs the key from `.env`):
+Send a trigger (this one calls Gemini, so it needs the credentials from `.env`):
 
 ```bash
 curl -s localhost:8080/tickets?wait=1 -H 'content-type: application/json' -d '{
