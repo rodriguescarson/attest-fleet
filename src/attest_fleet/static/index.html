@@ -357,6 +357,10 @@ button{font-family:inherit; cursor:pointer}
   text-transform:uppercase;color:var(--muted);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .fleetbar .fb.ok .fbn{color:var(--ok)} .fleetbar .fb.bad .fbn{color:var(--bad)}
 @media(max-width:700px){.fleetbar .fb{flex:1 1 33%}}
+.briefline{font-family:var(--mono);font-size:12px;color:var(--ink-2);margin:12px 0 0;
+  padding:11px 14px;border:1px solid var(--line);border-left:2px solid var(--accent);
+  border-radius:0 8px 8px 0;background:var(--panel);display:none;line-height:1.65}
+#briefBtn[aria-busy="true"]{opacity:.55;pointer-events:none}
 </style>
 </head>
 <body>
@@ -374,6 +378,7 @@ button{font-family:inherit; cursor:pointer}
     <span class="chip" id="modelChip" title="controller model">model <b>–</b></span>
     <button class="btn btn-sm" id="exBtn" title="Load sample runs to explore the interface">Example data</button>
     <button class="iconbtn" id="themeBtn" title="Toggle theme" aria-label="Toggle theme"></button>
+    <button class="btn" id="briefBtn" type="button" title="Hear the shift briefing: what needs a decision, spoken"><svg viewBox="0 0 24 24" fill="none"><path d="M12 4v16M8 8v8M16 8v8M4 11v2M20 11v2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg><span>Brief me</span></button>
     <button class="btn btn-kill" id="killBtn"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8.3" stroke="currentColor" stroke-width="1.7"/><path d="M12 7v6" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg><span>Kill switch</span></button>
   </header>
 
@@ -388,11 +393,11 @@ button{font-family:inherit; cursor:pointer}
   </div>
 
   <!-- HERO -->
-  <section class="hero" aria-label="Verification summary">
+  <section class="hero" aria-label="Verification summary" aria-live="assertive" aria-atomic="false">
     <div class="hero-shader" id="heroShader" aria-hidden="true"></div>
     <div class="hero-in">
       <div class="hero-left">
-        <div class="hero-eyebrow" data-tip="sf" tabindex="0">Silent failure rate</div>
+        <div class="hero-eyebrow" data-tip="sf" tabindex="0" id="sfLabel">Silent failure rate</div>
         <div class="hero-num" id="sfNum">–</div>
         <p class="hero-sub">Runs the fleet reported <b style="color:var(--ink)">done</b> that the system of record says were <b style="color:var(--crit)">not</b>. Invisible to the agents' own scoreboard.</p>
       </div>
@@ -406,6 +411,7 @@ button{font-family:inherit; cursor:pointer}
 
   <div class="strip" id="strip"></div>
   <div class="fleetbar" id="fleetbar" aria-label="Fleet scale"></div>
+  <p class="briefline" id="briefText" role="status" aria-live="polite"></p>
 
   <div class="esc" id="escBox">
     <svg viewBox="0 0 24 24" fill="none"><path d="M12 3l7 2.3v5c0 4.6-3 7.7-7 9.7-4-2-7-5.1-7-9.7v-5z" stroke="currentColor" stroke-width="1.6"/><path d="M12 8v4.5M12 15.4v.1" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
@@ -771,7 +777,8 @@ async function openDrawer(id){
   const s=stMeta(r.status); const ds=$("#drawerStatus"); ds.textContent=s.l; ds.className="verdict "+(r.status==="verified"?"v-ok":r.status==="silent_failure"?"v-silent":"v-none");
   const tick=r.ticket||{};
   const vis = r.vision ? `<div class="vis"><svg viewBox="0 0 24 24" fill="none"><rect x="3" y="5" width="18" height="14" rx="2" stroke="currentColor" stroke-width="1.5"/><circle cx="8.5" cy="10" r="1.4" fill="currentColor"/><path d="M5 17l4-4 3 2.5L16 11l3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg><div><span>Read from attachment (vision)</span>${esc(r.vision)}</div></div>` : "";
-  let h=`<div><div class="dh2">Trigger</div><div class="ticket-box"><div class="subj">${esc(tick.subject)}</div><div class="ref">${esc(tick.customer_ref)} · ${esc(tick.source||'webhook')}</div><div class="body">${esc(tick.body)}</div>${vis}</div></div>`;
+  const voi = r.voice ? `<div class="vis"><svg viewBox="0 0 24 24" fill="none"><path d="M12 4v16M8 8v8M16 8v8M4 11v2M20 11v2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg><div><span>Heard on the call (voice reader)</span>${esc(r.voice)}</div></div>` : "";
+  let h=`<div><div class="dh2">Trigger</div><div class="ticket-box"><div class="subj">${esc(tick.subject)}</div><div class="ref">${esc(tick.customer_ref)} · ${esc(tick.source||'webhook')}</div><div class="body">${esc(tick.body)}</div>${vis}${voi}</div></div>`;
   if(r.plan&&r.plan.customer_resolution) h+=`<div><div class="dh2">Controller resolution</div><div class="resolve">${esc(r.plan.customer_resolution)}</div></div>`;
   h+=`<div><div class="dh2">Tasks &amp; verification</div>`;
   (r.results||[]).forEach(t=>{
@@ -827,7 +834,16 @@ async function tick(){ await loadMetrics(); if(state.tab==="overview")loadOvervi
   let m; try{m=await api("/metrics")}catch(e){}
   if(!m || !m.runs){ setExample(true); toast("No live runs yet \u2014 showing example data"); return; }
   await loadMetrics(); loadOverview();
-  setInterval(()=>{ if(!drawerOpen && !exampleMode) tick(); }, 5000);
+  /* The board is pushed over SSE, not polled. EventSource reconnects on its own; the
+     interval below is a fallback only, and it is slow because the stream is the path. */
+  let streamLive=false;
+  try{
+    const es=new EventSource("/events");
+    es.addEventListener("board", ()=>{ if(!drawerOpen && !exampleMode) tick(); });
+    es.onopen =()=>{ streamLive=true;  const d=$("#liveDot"); if(d) d.title="live: streaming"; };
+    es.onerror=()=>{ streamLive=false; };
+  }catch(e){ streamLive=false; }
+  setInterval(()=>{ if(!streamLive && !drawerOpen && !exampleMode) tick(); }, 15000);
 })();
 </script>
 
@@ -859,6 +875,30 @@ async function tick(){ await loadMetrics(); if(state.tab==="overview")loadOvervi
   } catch (e) {
     host.remove();  // the CSS glow underneath is the fallback
   }
+})();
+</script>
+<script>
+/* Shift briefing. The transcript renders first, so the information is never gated behind
+   audio loading, a muted tab, or a listener who would rather read. Speech is a second
+   channel onto the same verified state, not the only one. */
+(() => {
+  const btn=document.getElementById("briefBtn"), out=document.getElementById("briefText");
+  if(!btn) return;
+  const label=btn.querySelector("span"); let audio=null;
+  btn.addEventListener("click", async () => {
+    if(audio && !audio.paused){ audio.pause(); audio.currentTime=0; label.textContent="Brief me"; return; }
+    btn.setAttribute("aria-busy","true");
+    try{
+      const t=await fetch("/briefing").then(r=>r.json());
+      out.textContent=t.script; out.style.display="block";
+      audio=new Audio("/briefing.wav?t="+Date.now());
+      audio.onended=()=>{ label.textContent="Brief me"; };
+      await audio.play(); label.textContent="Stop";
+    }catch(e){
+      if(!out.textContent) out.textContent="Briefing unavailable right now.";
+      out.style.display="block";
+    }finally{ btn.removeAttribute("aria-busy"); }
+  });
 })();
 </script>
 </body>

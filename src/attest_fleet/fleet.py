@@ -113,12 +113,14 @@ async def run_agent(agent_name: str, prompt: str, state: dict[str, Any], schema:
     raise RuntimeError(f"{agent_name} failed after {retries + 1} attempts: {last_err}")
 
 
-def _ticket_prompt(ticket: Ticket, vision: Optional[str] = None) -> str:
+def _ticket_prompt(ticket: Ticket, vision: Optional[str] = None, voice: Optional[str] = None) -> str:
     base = (f"TICKET {ticket.id} (source: {ticket.source})\n"
             f"Customer reference: {ticket.customer_ref}\n"
             f"Subject: {ticket.subject}\n\n{ticket.body}")
     if vision:
         base += f"\n\nATTACHED IMAGE (read by the vision model): {vision}"
+    if voice:
+        base += f"\n\nCALL RECORDING (transcribed by the voice reader): {voice}"
     return base
 
 
@@ -141,9 +143,28 @@ async def _audit(run_id: str, task: Task, claim: Optional[Claim]) -> Verificatio
                         false_alarm=(claim is not None and not claimed_done and verdict.verified), detail=verdict.reasoning)
 
 
+# Firestore caps a document at 1 MiB. A ticket carrying an inline data: attachment (a call
+# recording is easily over a megabyte on its own) blows that limit the moment the run record
+# is written, and the ticket is lost with it. The bytes are input, not evidence: what belongs
+# in the record is what the reader extracted from them, which is already stored as
+# run.vision / run.voice. So the payload is replaced with a short marker before persisting.
+_INLINE_LIMIT = 4096
+
+
+def _persistable(ticket: Ticket) -> Ticket:
+    """The ticket as it should be stored: inline attachment payloads swapped for markers."""
+    patch = {}
+    for field in ("image_url", "audio_url"):
+        value = getattr(ticket, field, None) or ""
+        if value.startswith("data:") and len(value) > _INLINE_LIMIT:
+            kind = value[5:].split(";")[0] or "application/octet-stream"
+            patch[field] = f"data:{kind};stored=false,{len(value)}-bytes-inline-attachment"
+    return ticket.model_copy(update=patch) if patch else ticket
+
+
 async def run_ticket(ticket: Ticket) -> RunRecord:
     store = get_store()
-    run = RunRecord(ticket=ticket)
+    run = RunRecord(ticket=_persistable(ticket))
     store.set("runs", run.id, run.model_dump())
     _log(run.id, "run", "started", ticket_id=ticket.id)
     agent_ticket = ticket.model_copy(update={"expected": None})  # ground truth never reaches an agent
@@ -171,7 +192,18 @@ async def run_ticket(ticket: Ticket) -> RunRecord:
                 store.set("runs", run.id, run.model_dump())
             except Exception as e:  # noqa: BLE001 — a bad attachment must not sink the ticket
                 _log(run.id, "model", "vision_error", agent="vision_reader", error=str(e)[:300])
-        plan = await run_agent("fleet_controller", _ticket_prompt(agent_ticket, vision_desc), {"run_id": run.id, "ticket_id": ticket.id}, Plan)
+        voice_desc: Optional[str] = None
+        if ticket.audio_url:
+            from .voice import read_call
+            t0 = time.perf_counter()
+            try:
+                voice_desc = await read_call(ticket.audio_url)
+                run.voice = voice_desc
+                _log(run.id, "model", "voice_read", agent="voice_reader", latency_ms=int((time.perf_counter() - t0) * 1000), heard=voice_desc)
+                store.set("runs", run.id, run.model_dump())
+            except Exception as e:  # noqa: BLE001 — a bad recording must not sink the ticket
+                _log(run.id, "model", "voice_error", agent="voice_reader", error=str(e)[:300])
+        plan = await run_agent("fleet_controller", _ticket_prompt(agent_ticket, vision_desc, voice_desc), {"run_id": run.id, "ticket_id": ticket.id}, Plan)
         run.plan = plan
         store.set("runs", run.id, run.model_dump())
         pairs: list[tuple[Claim, Verification]] = []

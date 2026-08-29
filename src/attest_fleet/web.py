@@ -16,8 +16,8 @@ from pathlib import Path
 from contextlib import asynccontextmanager
 from typing import Any, Optional
 
-from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Request
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Request, Response
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, StreamingResponse
 
 from . import config, metrics
 from .agents import AGENT_IDENTITIES
@@ -341,6 +341,82 @@ def fleet_identities() -> dict:
 @app.get("/fleet/playbook")
 def playbook() -> list[dict]:
     return get_store().list("playbook", limit=100)
+
+
+@app.get("/briefing")
+def briefing_text() -> dict:
+    """The shift briefing as text. Same content the spoken version reads."""
+    from . import briefing
+    store = get_store()
+    runs = store.list("runs", limit=5000)
+    m = metrics.compute(_pairs(runs), config.TARGET_RESIDUAL_RISK)
+    m["runs"] = len(runs)
+    m["by_status"] = {s: sum(1 for r in runs if r.get("status") == s)
+                      for s in ("verified", "silent_failure", "pending_approval", "failed", "killed", "running")}
+    worst = next(({"subject": r.get("ticket", {}).get("subject", ""), "run_id": r.get("id")}
+                  for r in runs if r.get("status") == "silent_failure"), None)
+    script = briefing.compose(m, len(store.query("approvals", status="pending")),
+                              bool(store.get_setting("kill_switch", False)), worst)
+    return {"script": script, "worst": worst}
+
+
+@app.get("/briefing.wav", include_in_schema=False)
+async def briefing_audio():
+    """The same briefing, spoken. Audio is a second channel onto verified state, never a
+    second source of truth: every number here was computed by metrics.py."""
+    from . import briefing
+    script = briefing_text()["script"]
+    try:
+        audio = await briefing.speak(script)
+    except Exception as e:  # noqa: BLE001 - speech is an enhancement; the text always works
+        raise HTTPException(503, f"briefing audio unavailable: {str(e)[:160]}")
+    return Response(content=audio, media_type="audio/wav",
+                    headers={"Cache-Control": "no-store"})
+
+
+@app.get("/events", include_in_schema=False)
+async def event_stream(request: Request):
+    """Server-sent events: the board is pushed, not polled.
+
+    The dashboard used to poll /runs and /metrics every five seconds per open tab, and
+    /runs alone scanned the runs collection seven times per request. On Firestore that is
+    real money and a real latency floor for a board that is usually idle. This streams a
+    compact digest instead and only sends when something actually changed, so an idle
+    fleet costs one read per interval and a busy one shows up immediately.
+
+    SSE rather than WebSockets on purpose: the traffic is one-directional, EventSource is
+    native in the browser with automatic reconnect, it survives Cloud Run's proxy without
+    a protocol upgrade, and it needs no dependency the service does not already have.
+    """
+    async def gen():
+        last = None
+        while True:
+            if await request.is_disconnected():
+                return
+            try:
+                runs = get_store().list("runs", limit=5000)
+                m = metrics.compute(_pairs(runs), config.TARGET_RESIDUAL_RISK)
+                digest = {
+                    "runs": len(runs),
+                    "silent_failure_rate": m.get("silent_failure_rate"),
+                    "reported_success_rate": m.get("reported_success_rate"),
+                    "verified_success_rate": m.get("verified_success_rate"),
+                    "by_status": {s: sum(1 for r in runs if r.get("status") == s)
+                                  for s in ("verified", "silent_failure", "pending_approval", "failed", "killed", "running")},
+                    "kill_switch": bool(get_store().get_setting("kill_switch", False)),
+                    "pending_approvals": len(get_store().query("approvals", status="pending")),
+                }
+                if digest != last:
+                    last = digest
+                    yield f"event: board\ndata: {json.dumps(digest)}\n\n"
+                else:
+                    yield ": keep-alive\n\n"
+            except Exception as e:  # noqa: BLE001 - a stream error must not kill the page
+                yield f"event: error\ndata: {json.dumps({'error': str(e)[:200]})}\n\n"
+            await asyncio.sleep(config.STREAM_INTERVAL_S)
+
+    return StreamingResponse(gen(), media_type="text/event-stream",
+                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
 
 @app.get("/health")

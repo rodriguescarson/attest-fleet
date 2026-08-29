@@ -16,7 +16,11 @@ APP_NAME = "attest_fleet"
 CONTROLLER_MODEL = os.getenv("ATTEST_CONTROLLER_MODEL", "gemini-3.7-flash")
 WORKER_MODEL = os.getenv("ATTEST_WORKER_MODEL", "gemini-3.7-flash")
 AUDITOR_MODEL = os.getenv("ATTEST_AUDITOR_MODEL", "gemma-4-31b-it")  # different family from the workers: independent verification (+ ATA extra-model bonus)
-VISION_MODEL = os.getenv("ATTEST_VISION_MODEL", "gemini-3.7-flash")  # multimodal intake: reads screenshots attached to a ticket
+VISION_MODEL = os.getenv("ATTEST_VISION_MODEL", "gemini-3.7-flash")
+VOICE_MODEL = os.getenv("ATTEST_VOICE_MODEL", "gemini-3.7-flash")  # audio intake: Gemini takes audio natively
+# TTS is Developer-API only (Vertex rejects the AUDIO response modality), same split as Gemma.
+BRIEFING_MODEL = os.getenv("ATTEST_BRIEFING_MODEL", "gemini-2.5-flash-preview-tts")
+BRIEFING_VOICE = os.getenv("ATTEST_BRIEFING_VOICE", "Kore")  # multimodal intake: reads screenshots attached to a ticket
 
 # --- Model fallback cascade ---------------------------------------------------
 # A brand-new Gemini Flash is demand-shed (HTTP 503) in the days after launch. Rather
@@ -46,9 +50,18 @@ MODEL_ARMOR_TEMPLATE = os.getenv("ATTEST_MODEL_ARMOR_TEMPLATE", "attest-ticket-g
 MODEL_ARMOR_LOCATION = os.getenv("ATTEST_MODEL_ARMOR_LOCATION", "asia-south1")
 
 
+# Two model families are Developer-API only: Gemma is not a Vertex publisher model, and
+# Vertex rejects the AUDIO response modality that text-to-speech needs. Everything else
+# runs on Vertex, project-billed.
+_DEV_API_ONLY = ("gemma", "-tts")
+
+
 def on_vertex(model: str) -> bool:
-    """Gemma is Developer-API only; everything else goes to Vertex when it is configured."""
-    return USE_VERTEX and bool(VERTEX_PROJECT) and not (model or "").startswith("gemma")
+    """Should this model be served by Vertex rather than the Gemini Developer API?"""
+    name = (model or "").lower()
+    if any(marker in name for marker in _DEV_API_ONLY):
+        return False
+    return USE_VERTEX and bool(VERTEX_PROJECT)
 
 
 def client_kwargs_for(model: str) -> dict:
@@ -88,6 +101,7 @@ FAULT_RATE = float(os.getenv("ATTEST_FAULT_RATE", "0"))
 # The verifier recommends the lowest confidence threshold whose residual
 # silent-failure rate is at or below this target.
 TARGET_RESIDUAL_RISK = float(os.getenv("ATTEST_TARGET_RESIDUAL_RISK", "0.02"))
+STREAM_INTERVAL_S = float(os.getenv("ATTEST_STREAM_INTERVAL_S", "2"))  # SSE digest cadence
 
 # Loop containment. A worker that never raises is otherwise bounded only by the Cloud Run
 # request timeout, so a runaway agent is capped two ways: a wall-clock budget per model

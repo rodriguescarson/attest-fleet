@@ -35,6 +35,7 @@ class Ticket(BaseModel):
     body: str
     created_at: str = Field(default_factory=now_iso)
     image_url: Optional[str] = Field(default=None, description="Optional attachment (https or data: URL) the vision reader describes before planning.")
+    audio_url: Optional[str] = Field(default=None, description="Optional call recording or voicemail (https or data: URL) transcribed before planning.")
     # Ground truth for the eval harness only. Stripped before any agent sees the ticket.
     expected: Optional["Expectation"] = None
 
@@ -155,6 +156,7 @@ class RunRecord(BaseModel):
     finished_at: Optional[str] = None
     error: Optional[str] = None
     vision: Optional[str] = None  # what the vision reader saw in an attached image
+    voice: Optional[str] = None   # what the voice reader heard in an attached call recording
     ground_truth: Optional[bool] = None  # eval harness: did the world end up as expected?
 
 
