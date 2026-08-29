@@ -217,6 +217,36 @@ def list_runs(q: str = "", status: str = "", sort: str = "started", order: str =
             "counts": {s: sum(1 for r in runs if r.get("status") == s) for s in ("verified", "silent_failure", "unverified", "pending_approval", "failed", "killed", "running")}}
 
 
+@app.get("/runs/interrupted")
+def interrupted_runs(older_than_s: int = 900) -> dict:
+    """Runs still marked `running` long after any real run would have finished.
+
+    This service executes a ticket in-process, so an instance replaced mid-run leaves the
+    record stuck in `running` forever. Full durable execution is not here, and pretending
+    otherwise would be the kind of claim this project exists to catch. What IS here is the
+    honest half: a lost run is detectable rather than silently abandoned, and it can be
+    resumed safely, because the idempotency guard means a mutation that already committed
+    will not fire twice on the retry."""
+    from datetime import datetime, timezone
+
+    now = datetime.now(timezone.utc)
+    stuck = []
+    for r in get_store().list("runs", limit=5000):
+        if r.get("status") != "running":
+            continue
+        try:
+            started = datetime.fromisoformat(str(r.get("started_at", "")).replace("Z", "+00:00"))
+        except ValueError:
+            continue
+        age = (now - started).total_seconds()
+        if age > older_than_s:
+            stuck.append({"run_id": r.get("id"), "age_seconds": int(age),
+                          "subject": (r.get("ticket") or {}).get("subject", ""),
+                          "tasks_completed": len(r.get("results") or [])})
+    return {"interrupted": stuck, "count": len(stuck), "older_than_s": older_than_s,
+            "resume_with": "POST /runs/{run_id}/resume"}
+
+
 @app.get("/runs/{run_id}")
 def get_run(run_id: str) -> dict:
     r = get_store().get("runs", run_id)
@@ -257,6 +287,25 @@ def run_evidence(run_id: str) -> Response:
     body = json.dumps(package, indent=2, default=str)
     return Response(content=body, media_type="application/json",
                     headers={"Content-Disposition": f'attachment; filename="evidence-{run_id}.json"'})
+
+
+@app.post("/runs/{run_id}/resume", status_code=202, dependencies=[Depends(require_operator)])
+async def resume_run(run_id: str, background: BackgroundTasks) -> dict:
+    """Re-run an interrupted ticket. Safe to call twice.
+
+    Resume is only defensible because mutations are idempotent within a task: a refund that
+    already committed returns its recorded result instead of paying again. Without that
+    guarantee, a resume button on a half-finished financial workflow would be a liability
+    rather than a feature."""
+    r = get_store().get("runs", run_id)
+    if not r:
+        raise HTTPException(404)
+    if r.get("status") not in ("running", "failed", "unverified"):
+        raise HTTPException(409, f"run is {r.get('status')}; nothing to resume")
+    ticket = Ticket.model_validate(r["ticket"])
+    background.add_task(run_ticket, ticket)
+    return {"resuming": run_id, "ticket_id": ticket.id,
+            "note": "completed mutations will not re-fire; the idempotency guard returns their recorded result"}
 
 
 @app.get("/metrics")

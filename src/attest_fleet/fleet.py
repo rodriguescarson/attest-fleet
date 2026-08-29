@@ -219,7 +219,7 @@ async def run_ticket(ticket: Ticket) -> RunRecord:
                 claim.task_id = task.id
             except Exception as e:  # noqa: BLE001
                 _log(run.id, "run", "worker_error", task_id=task.id, agent=task.worker, error=str(e)[:500])
-            verification = verify(store, task, claim)
+            verification = verify(store, task, claim, run_id=run.id)
             if verification.method == "none":
                 verification = await _audit(run.id, task, claim)
             _log(run.id, "verify", "verified", task_id=task.id, verified=verification.verified, silent=verification.silent_failure, detail=verification.detail[:500])

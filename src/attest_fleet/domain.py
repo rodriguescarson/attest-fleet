@@ -101,6 +101,11 @@ class Verification(BaseModel):
     silent_failure: bool = False  # claimed done, world disagrees
     false_alarm: bool = False  # claimed failed/blocked, world says it is fine
     detail: str = ""
+    # Process conformance, kept SEPARATE from `verified` on purpose. An end-state pass with
+    # a process failure is not a silent failure, and folding the two together would lose
+    # exactly the distinction this field exists to make.
+    process_checks: list[Check] = Field(default_factory=list)
+    process_conformant: Optional[bool] = None
 
 
 class AuditVerdict(BaseModel):

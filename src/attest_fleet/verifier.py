@@ -90,10 +90,19 @@ POSTCONDITIONS = {
 }
 
 
-def verify(store: BaseStore, task: Task, claim: Optional[Claim]) -> Verification:
+def verify(store: BaseStore, task: Task, claim: Optional[Claim],
+           run_id: str = "") -> Verification:
+    from .process import check_process, summarise
+    from .tools import MUTATING
+
+    proc = check_process(store, run_id, task, claim, MUTATING) if run_id else []
+    proc_verdict = summarise(proc)["conformant"]
+
     fn = POSTCONDITIONS.get(task.type)
     if fn is None:
-        return Verification(task_id=task.id, verified=None, method="none", detail="no deterministic post-condition; auditor required")
+        return Verification(task_id=task.id, verified=None, method="none",
+                            process_checks=proc, process_conformant=proc_verdict,
+                            detail="no deterministic post-condition; auditor required")
     checks = fn(store, task)
     verified = all(c.passed for c in checks)
     claimed_done = bool(claim and claim.outcome == "done")
@@ -102,6 +111,8 @@ def verify(store: BaseStore, task: Task, claim: Optional[Claim]) -> Verification
         verified=verified,
         method="postcondition",
         checks=checks,
+        process_checks=proc,
+        process_conformant=proc_verdict,
         silent_failure=claimed_done and not verified,
         false_alarm=(claim is not None and not claimed_done and verified),
         detail="; ".join(f"{c.name}={'ok' if c.passed else 'FAIL'} ({c.detail})" for c in checks),
