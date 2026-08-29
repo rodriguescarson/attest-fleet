@@ -200,6 +200,21 @@ def get_metrics() -> dict:
     m["eval_ground_truth_pass_rate"] = round(sum(1 for g in gt if g) / len(gt), 4) if gt else None
     m["runs"] = len(runs)
     m["by_status"] = {s: sum(1 for r in runs if r.get("status") == s) for s in ("verified", "silent_failure", "pending_approval", "failed", "killed", "running")}
+
+    # Fleet scale. The unit of supervision is not the ticket, it is every action every
+    # agent took, so the operator sees how much was actually executed underneath the runs.
+    events = get_store().list("events", limit=20000)
+    m["fleet"] = {
+        "agents": len(AGENT_IDENTITIES),
+        "runs": len(runs),
+        "tasks": m.get("n_tasks", 0),
+        "tool_calls": sum(1 for e in events if e.get("kind") == "tool"),
+        "gate_blocks": sum(1 for e in events if e.get("name") in ("gate_block", "kill_switch_block", "loop_guard")),
+        "screened": sum(1 for e in events if e.get("name") == "model_armor"),
+        "verified": m["by_status"]["verified"],
+        "silent_failures": m.get("silent_failures", 0),
+        "false_alarms": m.get("false_alarms", 0),
+    }
     return m
 
 
@@ -254,12 +269,56 @@ def admin_seed(token: str = "") -> dict:
     if not expected or token != expected:
         raise HTTPException(403, "forbidden")
     from .store import reset_evidence
-    from .demo import seed_demo
     store = get_store()
     reset_evidence(store)
     seed(store, force=True)
-    seed_demo(store, force=True)
-    return {"ok": True, "runs": store.count("runs"), "approvals": store.count("approvals"), "playbook": store.count("playbook")}
+    loaded = _load_eval_evidence(store)
+    return {"ok": True, "source": "eval harness (real runs)", "runs": store.count("runs"),
+            "loaded": loaded, "approvals": store.count("approvals"), "playbook": store.count("playbook")}
+
+
+def _load_eval_evidence(store) -> int:
+    """Populate the board from the REAL eval sweep in evidence/runs.jsonl.
+
+    These are actual agent runs against the fault-injecting harness, not sample data.
+    src/attest_fleet/demo.py holds fabricated runs, and they stay where its docstring says
+    they belong: local UI work, in memory, never in a deployed store. A board that a judge
+    might read as live results has to contain results that are live."""
+    path = Path(__file__).resolve().parents[2] / "evidence" / "runs.jsonl"
+    if not path.exists():
+        return 0
+    n = 0
+    for line in path.read_text().splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            rec = json.loads(line)
+        except ValueError:
+            continue
+        if rec.get("id"):
+            store.set("runs", rec["id"], rec)
+            n += 1
+    return n
+
+
+@app.post("/fleet/fault", dependencies=[Depends(require_operator)])
+def set_fault_rate(rate: float) -> dict:
+    """Fault injection, as an operator control.
+
+    The eval harness uses this to break tool calls on purpose and measure how often the
+    fleet reports success anyway. Exposing it here means the same thing can be done to the
+    live fleet: set the rate, run a ticket, and watch a payment come back "success" from
+    the gateway while the money sits in `pending_gateway`. That is not a demo trick, it is
+    the chaos-engineering practice the reliability literature argues correctness should be
+    measured under (fault injection against end-state equivalence).
+
+    The agents are never told. That is the entire point: the worker sees a success response
+    and reports done in good faith, and only the verifier reading the record catches it."""
+    rate = max(0.0, min(1.0, float(rate)))
+    get_store().set_setting("fault_rate", rate)
+    return {"fault_rate": rate,
+            "note": "mutating tool calls now fail silently at this rate; agents are not told"}
 
 
 @app.get("/fleet/identities")

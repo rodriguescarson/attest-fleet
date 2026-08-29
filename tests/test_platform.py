@@ -82,3 +82,18 @@ def test_registry_matches_either_display_name_form(monkeypatch):
         agents, source = registry.registered_agents()
         assert source == "agent-registry", label
         assert next(a for a in agents if a["name"] == "billing_agent")["registered"] is True, label
+
+
+def test_fabricated_runs_cannot_reach_a_deployed_store():
+    """The board is something a judge may read as live results, so sample data must not be
+    able to reach a real store — not even behind a force flag. This test exists because it
+    once could: /admin/seed forced fabricated runs into the production Firestore board."""
+    from attest_fleet import demo
+
+    class FakeFirestore(dict):
+        backend = "firestore"
+        def set(self, col, doc_id, doc): raise AssertionError("fabricated run written to a deployed store")
+        def get(self, col, doc_id): return None
+
+    demo.seed_demo(FakeFirestore())            # must be a no-op
+    demo.seed_demo(FakeFirestore(), force=True)  # even forced

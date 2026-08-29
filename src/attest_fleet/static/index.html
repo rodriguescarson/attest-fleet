@@ -334,6 +334,21 @@ button{font-family:inherit; cursor:pointer}
 .regsrc{font-family:"JetBrains Mono",monospace;font-size:12px;padding:8px 12px;border-radius:8px;margin:0 0 12px;border:1px solid var(--line)}
 .regsrc.ok{color:var(--ok);border-color:color-mix(in srgb,var(--ok) 40%,transparent);background:color-mix(in srgb,var(--ok) 8%,transparent)}
 .regsrc.warn{color:var(--ink-2)}
+.sidelabel{font-family:"JetBrains Mono",monospace;font-size:10.5px;letter-spacing:.09em;
+  text-transform:uppercase;color:var(--muted);margin:10px 0 5px}
+.sidelabel.indep{color:var(--ok)}
+.sidelabel.indep::before{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;
+  background:var(--ok);margin-right:6px;vertical-align:middle}
+.fleetbar{display:flex;flex-wrap:wrap;gap:0;margin-top:14px;border:1px solid var(--line);
+  border-radius:var(--r);overflow:hidden;background:var(--panel)}
+.fleetbar .fb{flex:1 1 118px;padding:11px 14px;border-right:1px solid var(--line);min-width:0}
+.fleetbar .fb:last-child{border-right:0}
+.fleetbar .fbn{font-family:"JetBrains Mono",monospace;font-size:19px;font-weight:700;
+  font-variant-numeric:tabular-nums;line-height:1.15;color:var(--ink)}
+.fleetbar .fbl{font-family:"JetBrains Mono",monospace;font-size:10px;letter-spacing:.07em;
+  text-transform:uppercase;color:var(--muted);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fleetbar .fb.ok .fbn{color:var(--ok)} .fleetbar .fb.bad .fbn{color:var(--bad)}
+@media(max-width:700px){.fleetbar .fb{flex:1 1 33%}}
 </style>
 </head>
 <body>
@@ -381,6 +396,7 @@ button{font-family:inherit; cursor:pointer}
   </section>
 
   <div class="strip" id="strip"></div>
+  <div class="fleetbar" id="fleetbar" aria-label="Fleet scale"></div>
 
   <div class="esc" id="escBox">
     <svg viewBox="0 0 24 24" fill="none"><path d="M12 3l7 2.3v5c0 4.6-3 7.7-7 9.7-4-2-7-5.1-7-9.7v-5z" stroke="currentColor" stroke-width="1.6"/><path d="M12 8v4.5M12 15.4v.1" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
@@ -602,6 +618,21 @@ async function loadMetrics(){
     {k:"Eval ground truth",tip:"gt",v:pct(m.eval_ground_truth_pass_rate),cls:m.eval_ground_truth_pass_rate!=null?"ok":"",icon:'<path d="M9 12l2 2 4-4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="12" r="8.3" stroke="currentColor" stroke-width="1.5"/>'},
   ];
   $("#strip").innerHTML=strip.map(s=>`<div class="metric"><div class="k" data-tip="${s.tip}" tabindex="0"><svg viewBox="0 0 24 24" fill="none">${s.icon}</svg>${s.k}</div><div class="v ${s.cls||""} ${String(s.v).length>7?'small':''}">${esc(s.v)}</div></div>`).join("");
+
+  // Fleet scale: the unit of supervision is every action, not just the ticket.
+  const F=m.fleet||{};
+  const fb=[
+    {n:F.agents,       l:"agents"},
+    {n:F.runs,         l:"runs"},
+    {n:F.tool_calls,   l:"tool calls"},
+    {n:F.screened,     l:"tickets screened"},
+    {n:F.gate_blocks,  l:"actions gated"},
+    {n:F.verified,     l:"verified", cls:"ok"},
+    {n:F.silent_failures, l:"silent failures", cls:"bad"},
+    {n:F.false_alarms, l:"false alarms"},
+  ].filter(x=>x.n!=null);
+  const fbEl=$("#fleetbar");
+  if(fbEl) fbEl.innerHTML=fb.map(x=>`<div class="fb ${x.cls||""}"><div class="fbn">${esc(String(x.n))}</div><div class="fbl">${esc(x.l)}</div></div>`).join("");
   const e2=m.escalation;
   $("#escTxt").innerHTML = e2
     ? `<b>Escalation policy:</b> route runs below confidence <b>${e2.threshold.toFixed(2)}</b> to a human. Auto-accept <b>${(e2.coverage*100).toFixed(0)}%</b> of claims at <b>${(e2.risk*100).toFixed(1)}%</b> residual silent-failure risk.`
@@ -740,9 +771,10 @@ async function openDrawer(id){
     const vl = v.verified===true?"verified":v.silent_failure?"silent failure":v.verified===false?"not verified":"unverifiable";
     const conf = c.confidence!=null?`<span class="conf"><i style="width:${(c.confidence*100)}%"></i></span> <b>${c.confidence.toFixed(2)}</b>`:"–";
     h+=`<div class="task ${v.silent_failure?'silent':''}"><div class="task-h"><span class="ty">${esc(t.task.type)}</span><span class="w">${esc(t.task.worker)}</span><span class="verdict ${vc}">${vl}</span></div><div class="task-b">
+      <div class="sidelabel">What the agent claimed</div>
       <div class="claim-line"><span class="kv"><span>claim</span><b style="color:${c.outcome==='done'?'var(--ok)':c.outcome==='blocked'?'var(--warn)':'var(--muted)'}">${esc(c.outcome||'–')}</b></span><span class="kv"><span>confidence</span><b>${conf}</b></span></div>
       ${c.evidence?`<div class="ev">${esc(c.evidence)}</div>`:""}
-      ${(v.checks&&v.checks.length)?`<div class="checks">${v.checks.map(ch=>`<div class="chk ${ch.passed?'pass':'fail'}"><svg viewBox="0 0 24 24" fill="none">${ch.passed?'<path d="M5 12l4 4 10-10" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>':'<path d="M7 7l10 10M17 7L7 17" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>'}</svg><span><span class="cn">${esc(ch.name)}</span> – ${esc(ch.detail||'')}</span></div>`).join("")}</div>`:""}
+      ${(v.checks&&v.checks.length)?`<div class="sidelabel indep">Independent reality check &middot; read from the system of record</div><div class="checks">${v.checks.map(ch=>`<div class="chk ${ch.passed?'pass':'fail'}"><svg viewBox="0 0 24 24" fill="none">${ch.passed?'<path d="M5 12l4 4 10-10" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>':'<path d="M7 7l10 10M17 7L7 17" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>'}</svg><span><span class="cn">${esc(ch.name)}</span> – ${esc(ch.detail||'')}</span></div>`).join("")}</div>`:""}
       ${v.detail&&!(v.checks&&v.checks.length)?`<div class="ev" style="color:var(--muted)">${esc(v.detail)}</div>`:""}
     </div></div>`;
   });
