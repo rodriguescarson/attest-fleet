@@ -151,7 +151,7 @@ class RunRecord(BaseModel):
     ticket: Ticket
     plan: Optional[Plan] = None
     results: list[TaskResult] = Field(default_factory=list)
-    status: Literal["running", "verified", "silent_failure", "pending_approval", "failed", "killed"] = "running"
+    status: Literal["running", "verified", "silent_failure", "unverified", "pending_approval", "failed", "killed"] = "running"
     started_at: str = Field(default_factory=now_iso)
     finished_at: Optional[str] = None
     error: Optional[str] = None

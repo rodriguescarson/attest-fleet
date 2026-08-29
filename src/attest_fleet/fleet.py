@@ -225,11 +225,19 @@ async def run_ticket(ticket: Ticket) -> RunRecord:
             if claim:
                 pairs.append((claim, verification))
             store.set("runs", run.id, run.model_dump())
+        # THE INVARIANT: no agent declares its own success. A worker returns a claim; the
+        # run's status is derived here, from what the verifier found in the system of
+        # record. `claim.outcome` never sets `verified` on any path below.
         if any(r.verification and r.verification.silent_failure for r in run.results):
             run.status = "silent_failure"
         elif any(r.claim and r.claim.outcome == "blocked" for r in run.results):
             run.status = "pending_approval"
-        elif all(r.verification and r.verification.verified for r in run.results) and run.results:
+        elif any(r.verification is None or r.verification.verified is None for r in run.results):
+            # UNVERIFIABLE IS NOT SUCCESS, and it is not failure either. A task the verifier
+            # could not check is a third outcome, and collapsing it into either one would be
+            # the same error this fleet exists to catch: reporting a state nobody confirmed.
+            run.status = "unverified"
+        elif all(r.verification.verified for r in run.results) and run.results:
             run.status = "verified"
         else:
             run.status = "failed"

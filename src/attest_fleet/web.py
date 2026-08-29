@@ -183,7 +183,7 @@ def list_runs(q: str = "", status: str = "", sort: str = "started", order: str =
             # Count from the list already in hand. This previously re-scanned the whole
             # collection once per status - seven full Firestore scans per request, on a
             # dashboard that polls every five seconds.
-            "counts": {s: sum(1 for r in runs if r.get("status") == s) for s in ("verified", "silent_failure", "pending_approval", "failed", "killed", "running")}}
+            "counts": {s: sum(1 for r in runs if r.get("status") == s) for s in ("verified", "silent_failure", "unverified", "pending_approval", "failed", "killed", "running")}}
 
 
 @app.get("/runs/{run_id}")
@@ -195,6 +195,35 @@ def get_run(run_id: str) -> dict:
     return {**r, "events": events}
 
 
+@app.get("/runs/{run_id}/evidence")
+def run_evidence(run_id: str) -> Response:
+    """The whole run as one auditable artefact: ticket, plan, every claim, every
+    verification with its checks, and the ordered event trail.
+
+    An outcome an auditor cannot reconstruct is not evidence, it is a status. This is the
+    file you hand someone who asks why a refund moved."""
+    store = get_store()
+    r = store.get("runs", run_id)
+    if not r:
+        raise HTTPException(404)
+    events = sorted(store.query("events", run_id=run_id), key=lambda e: e.get("ts", ""))
+    approvals = [a for a in store.list("approvals", limit=500) if a.get("run_id") == run_id]
+    from .contracts import all_contracts
+
+    package = {
+        "run": r,
+        "events": events,
+        "approvals": approvals,
+        "agent_contracts": all_contracts(),
+        "verification_method": "post-conditions read from the system of record; "
+                               "LLM auditor only where no deterministic check exists",
+        "generated_at": now_iso(),
+    }
+    body = json.dumps(package, indent=2, default=str)
+    return Response(content=body, media_type="application/json",
+                    headers={"Content-Disposition": f'attachment; filename="evidence-{run_id}.json"'})
+
+
 @app.get("/metrics")
 def get_metrics() -> dict:
     runs = get_store().list("runs", limit=5000)
@@ -202,7 +231,7 @@ def get_metrics() -> dict:
     gt = [r["ground_truth"] for r in runs if r.get("ground_truth") is not None]
     m["eval_ground_truth_pass_rate"] = round(sum(1 for g in gt if g) / len(gt), 4) if gt else None
     m["runs"] = len(runs)
-    m["by_status"] = {s: sum(1 for r in runs if r.get("status") == s) for s in ("verified", "silent_failure", "pending_approval", "failed", "killed", "running")}
+    m["by_status"] = {s: sum(1 for r in runs if r.get("status") == s) for s in ("verified", "silent_failure", "unverified", "pending_approval", "failed", "killed", "running")}
 
     # Fleet scale. The unit of supervision is not the ticket, it is every action every
     # agent took, so the operator sees how much was actually executed underneath the runs.
@@ -343,6 +372,31 @@ def playbook() -> list[dict]:
     return get_store().list("playbook", limit=100)
 
 
+def _latest_silent_failure(runs: list[dict]) -> Optional[dict]:
+    """Claim and verdict for the most recent silent failure, paired.
+
+    They travel together on every channel. Separating them is the bug: a spoken "the refund
+    is done" inherits the over-confidence the verifier was built to detect, so the alert
+    always carries what the record actually said alongside what the agent claimed."""
+    newest = None
+    for r in sorted(runs, key=lambda x: x.get("started_at", ""), reverse=True):
+        for tr in r.get("results", []):
+            v, c = tr.get("verification") or {}, tr.get("claim") or {}
+            if v.get("silent_failure"):
+                failed = [ch for ch in (v.get("checks") or []) if not ch.get("passed")]
+                newest = {
+                    "run_id": r.get("id"),
+                    "worker": (tr.get("task") or {}).get("worker"),
+                    "subject": (r.get("ticket") or {}).get("subject", ""),
+                    "claim": c.get("outcome"),
+                    "confidence": c.get("confidence"),
+                    "record": (failed[0].get("detail") if failed else v.get("detail", "")),
+                    "method": v.get("method"),
+                }
+                return newest
+    return newest
+
+
 @app.get("/briefing")
 def briefing_text() -> dict:
     """The shift briefing as text. Same content the spoken version reads."""
@@ -352,7 +406,7 @@ def briefing_text() -> dict:
     m = metrics.compute(_pairs(runs), config.TARGET_RESIDUAL_RISK)
     m["runs"] = len(runs)
     m["by_status"] = {s: sum(1 for r in runs if r.get("status") == s)
-                      for s in ("verified", "silent_failure", "pending_approval", "failed", "killed", "running")}
+                      for s in ("verified", "silent_failure", "unverified", "pending_approval", "failed", "killed", "running")}
     worst = next(({"subject": r.get("ticket", {}).get("subject", ""), "run_id": r.get("id")}
                   for r in runs if r.get("status") == "silent_failure"), None)
     script = briefing.compose(m, len(store.query("approvals", status="pending")),
@@ -402,9 +456,13 @@ async def event_stream(request: Request):
                     "reported_success_rate": m.get("reported_success_rate"),
                     "verified_success_rate": m.get("verified_success_rate"),
                     "by_status": {s: sum(1 for r in runs if r.get("status") == s)
-                                  for s in ("verified", "silent_failure", "pending_approval", "failed", "killed", "running")},
+                                  for s in ("verified", "silent_failure", "unverified", "pending_approval", "failed", "killed", "running")},
                     "kill_switch": bool(get_store().get_setting("kill_switch", False)),
                     "pending_approvals": len(get_store().query("approvals", status="pending")),
+                    # The newest caught silent failure, carried as claim AND verdict together.
+                    # An alert that voices only the claim would reproduce the exact failure
+                    # this fleet exists to catch: a confident sentence with nothing checking it.
+                    "latest_silent_failure": _latest_silent_failure(runs),
                 }
                 if digest != last:
                     last = digest

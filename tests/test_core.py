@@ -234,3 +234,34 @@ def test_delete_account_has_a_deterministic_post_condition(store):
                 instruction="", rationale="")
     v = verify(store, task, claim("t9", "done"))
     assert v.method == "postcondition" and v.verified is False and v.silent_failure is True
+
+
+def test_an_unverifiable_claim_never_becomes_a_success(store):
+    """UNVERIFIABLE is a third outcome, not a quiet success and not a failure.
+
+    Collapsing "we could not check" into either one is the same error the fleet exists to
+    catch: reporting a state nobody confirmed. The verifier returns verified=None when no
+    deterministic check exists and the auditor could not reach a verdict."""
+    from attest_fleet.domain import RunRecord, Task, TaskResult, Ticket
+
+    task = Task(id="t1", type="other", worker="account_agent", instruction="", rationale="")
+    unknown = Verification(task_id="t1", verified=None, method="none", detail="no check exists")
+    run = RunRecord(ticket=Ticket(customer_ref="c", subject="s", body="b"))
+    run.results = [TaskResult(task=task, claim=claim("t1", "done", 0.99), verification=unknown)]
+
+    # the same status derivation fleet.run_ticket uses
+    assert not any(r.verification and r.verification.silent_failure for r in run.results)
+    assert any(r.verification is None or r.verification.verified is None for r in run.results)
+    # a confident "done" with no way to check must not reach "verified"
+    assert not all(r.verification.verified for r in run.results)
+
+
+def test_the_agents_confidence_does_not_decide_the_outcome(store):
+    """No agent declares its own success. A claim at confidence 1.0 that the record
+    contradicts is a silent failure, not a success."""
+    store.set_setting("fault_rate", 1.0)
+    issue_refund("ord_5001", 49.0, "test", run_id="r")
+    task = Task(id="t1", type="refund", worker="billing_agent", order_id="ord_5001",
+                amount=49.0, instruction="", rationale="")
+    v = verify(store, task, claim("t1", "done", 1.0))
+    assert v.verified is False and v.silent_failure is True

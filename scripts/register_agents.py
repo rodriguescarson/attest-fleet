@@ -38,6 +38,17 @@ def token() -> str:
     return creds.token
 
 
+def _described(a: dict, c: dict) -> str:
+    """Role plus the authority boundary, as one line the registry will carry."""
+    if c["may_mutate"]:
+        auth = "may change: " + ", ".join(c["may_mutate"])
+        if c["needs_human_above"]:
+            auth += f"; human approval above {c['needs_human_above']}"
+    else:
+        auth = "read-only: holds no mutating tool"
+    return f"{a['role']}. Authority — {auth}. Enforced at {c['enforced_at']}."
+
+
 def agent_card(a: dict) -> dict:
     """An A2A agent card. Each tool the agent may call becomes an indexed skill, tagged
     with whether it mutates the system of record — so the registry itself records which
@@ -54,11 +65,16 @@ def agent_card(a: dict) -> dict:
     if not skills:
         skills = [{"id": f"{a['name']}-verify", "name": "verify",
                    "description": a["role"], "tags": ["attest-fleet", a["name"]]}]
+    from attest_fleet.contracts import contract_for
+    c = contract_for(a["name"])
     return {
         "supportedInterfaces": [{"url": f"{FLEET_URL}/fleet/identities",
                                  "protocolBinding": "HTTP+JSON", "protocolVersion": "1.0.0"}],
         "name": a["name"],
-        "description": a["role"],
+        # The A2A card schema is closed, so the authority boundary rides in the description
+        # rather than a custom field. It still travels with the agent, which is the point:
+        # a consumer can see what this agent may change before deciding to call it.
+        "description": _described(a, c),
         "version": "1.0.0",
         "capabilities": {"streaming": False, "pushNotifications": False},
         "defaultInputModes": ["text/plain"],

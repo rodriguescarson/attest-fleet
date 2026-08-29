@@ -80,9 +80,14 @@ def registered_agents() -> tuple[list[dict], str]:
     except Exception:  # noqa: BLE001 - the registry is an enrichment, never a hard dependency
         by_name, source = {}, "local"
 
+    from .contracts import contract_for
+
     out = []
     for ident in AGENT_IDENTITIES:
         entry = dict(ident)
+        # The card says what the agent may do, not just what it is. An agent without a
+        # stated, derived authority boundary is a prompt, not a principal.
+        entry["contract"] = contract_for(ident["name"])
         hit = by_name.get(ident["name"])
         if hit:
             entry["registry"] = {

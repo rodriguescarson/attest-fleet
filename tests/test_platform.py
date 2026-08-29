@@ -97,3 +97,30 @@ def test_fabricated_runs_cannot_reach_a_deployed_store():
 
     demo.seed_demo(FakeFirestore())            # must be a no-op
     demo.seed_demo(FakeFirestore(), force=True)  # even forced
+
+
+def test_agent_contracts_match_the_live_tool_bindings():
+    """A contract that can silently stop being true is worth less than no contract. This
+    re-derives every field from what ADK actually binds, so handing billing_agent an
+    address tool fails the build rather than quietly making the published card wrong."""
+    from attest_fleet import contracts
+    contracts.verify_contracts()
+
+
+def test_worker_write_scopes_are_disjoint():
+    """The multi-agent split exists to create separate least-privilege write scopes. If the
+    workers can reach each other's mutations, the split has stopped paying for itself."""
+    from attest_fleet.contracts import contract_for
+    billing = set(contract_for("billing_agent")["may_mutate"])
+    account = set(contract_for("account_agent")["may_mutate"])
+    assert "issue_refund" in billing and "issue_refund" not in account
+    assert "update_address" in account and "update_address" not in billing
+    assert "delete_account" not in billing
+
+
+def test_the_agent_with_the_most_context_has_no_authority():
+    """fleet_controller is the only component that sees the whole ticket, so it holds no
+    mutating tool at all."""
+    from attest_fleet.contracts import contract_for
+    assert contract_for("fleet_controller")["may_mutate"] == []
+    assert contract_for("vision_reader")["may_call"] == []
