@@ -4,185 +4,176 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
-  html,body{margin:0;background:#080c0d;}
+  html,body{margin:0;background:#080c0d}
   svg{display:block}
   .t{font-family:"Hanken Grotesk",system-ui,sans-serif}
   .m{font-family:"JetBrains Mono",ui-monospace,monospace}
 </style>
 
-<svg width="1450" height="752" viewBox="0 0 1640 850" xmlns="http://www.w3.org/2000/svg">
-  <defs>
-    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-      <path d="M0,0 L10,5 L0,10 z" fill="#5c7573"/>
-    </marker>
-    <marker id="ag" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-      <path d="M0,0 L10,5 L0,10 z" fill="#34d399"/>
-    </marker>
-    <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-      <path d="M0,0 L10,5 L0,10 z" fill="#fb7185"/>
-    </marker>
-    <marker id="ap" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-      <path d="M0,0 L10,5 L0,10 z" fill="#a78bfa"/>
-    </marker>
-  </defs>
+<svg width="1250" height="742" viewBox="0 0 1500 890" xmlns="http://www.w3.org/2000/svg">
+<defs>
+  <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#5c7573"/></marker>
+  <marker id="ag" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#34d399"/></marker>
+  <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#fb7185"/></marker>
+  <marker id="ap" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#a78bfa"/></marker>
+  <marker id="ac" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#22d3ee"/></marker>
+</defs>
+<rect width="1500" height="890" fill="#080c0d"/>
 
-  <rect width="1640" height="850" fill="#080c0d"/>
+<!-- header -->
+<text class="t" x="48" y="52" fill="#eaf3f1" font-size="30" font-weight="700" letter-spacing="-.4">Attest Fleet — architecture</text>
+<text class="m" x="48" y="79" fill="#7f9694" font-size="14">A governed agent fleet on <tspan fill="#22d3ee">Gemini 3.7 · Vertex AI · ADK · Cloud Run · Firestore</tspan>. Every &#8220;done&#8221; is a <tspan fill="#eaf3f1">claim</tspan>, checked against the record.</text>
+<text class="m" x="1452" y="52" fill="#34d399" font-size="15" font-weight="700" text-anchor="end" letter-spacing="1.2">EXECUTE → ATTEST → ADAPT</text>
 
-  <!-- ===== header ===== -->
-  <text class="t" x="56" y="56" fill="#eaf3f1" font-size="31" font-weight="700" letter-spacing="-0.4">Attest Fleet — architecture</text>
-  <text class="m" x="56" y="85" fill="#7f9694" font-size="14.5">Governed multi-agent fleet on <tspan fill="#22d3ee">Gemini 3.7 Flash</tspan> + <tspan fill="#22d3ee">ADK</tspan> + <tspan fill="#22d3ee">Cloud Run</tspan> + <tspan fill="#22d3ee">Firestore</tspan>. Every &#8220;done&#8221; is a <tspan fill="#eaf3f1">claim</tspan>, checked against the system of record.</text>
+<!-- ===== control plane ===== -->
+<rect x="48" y="102" width="1404" height="92" rx="11" fill="none" stroke="#2c3b3e" stroke-dasharray="7 5"/>
+<text class="m" x="64" y="122" fill="#4d6360" font-size="10.5" letter-spacing="1.5">ENTERPRISE CONTROL PLANE</text>
 
-  <!-- ===== BAND 1 : EXECUTE ===== -->
-  <text class="m" x="140" y="142" fill="#4d6360" font-size="12.5" letter-spacing="1.6">1 · EXECUTE</text>
+<rect x="66" y="130" width="640" height="52" rx="8" fill="#0d1a1e" stroke="#1c4a55"/>
+<text class="t" x="82" y="152" fill="#22d3ee" font-size="14" font-weight="600">Agent Registry</text>
+<text class="m" x="82" y="170" fill="#7f9694" font-size="10.5">publish · version · discover</text>
+<text class="m" x="318" y="150" fill="#a3b8b5" font-size="10">billing_agent · account_agent · fleet_controller</text>
+<text class="m" x="318" y="169" fill="#a3b8b5" font-size="10">vision_reader · auditor   —   all v1.0</text>
+<text class="m" x="690" y="159" fill="#34d399" font-size="10.5" text-anchor="end">5 agents · 20 skills</text>
 
-  <!-- ticket -->
-  <rect x="140" y="160" width="165" height="76" rx="9" fill="#101718" stroke="#243133"/>
-  <text class="t" x="222" y="190" fill="#eaf3f1" font-size="14.5" font-weight="600" text-anchor="middle">Ticket trigger</text>
-  <text class="m" x="222" y="211" fill="#7f9694" font-size="11.5" text-anchor="middle">webhook · Pub/Sub</text>
-  <text class="m" x="222" y="227" fill="#4d6360" font-size="10.5" text-anchor="middle">not a chat box</text>
+<rect x="726" y="130" width="380" height="52" rx="8" fill="#0d1a1e" stroke="#1c4a55"/>
+<text class="t" x="742" y="152" fill="#22d3ee" font-size="14" font-weight="600">Agent Observability</text>
+<text class="m" x="742" y="170" fill="#7f9694" font-size="10.5">OpenTelemetry GenAI spans → Cloud Trace</text>
 
-  <!-- vision -->
-  <rect x="333" y="160" width="165" height="76" rx="9" fill="#0d1a1e" stroke="#1c4a55"/>
-  <text class="t" x="415" y="190" fill="#eaf3f1" font-size="14.5" font-weight="600" text-anchor="middle">Vision reader</text>
-  <text class="m" x="415" y="211" fill="#22d3ee" font-size="11.5" text-anchor="middle">Gemini 3.7</text>
-  <text class="m" x="415" y="227" fill="#4d6360" font-size="10.5" text-anchor="middle">reads attachment</text>
+<rect x="1126" y="130" width="308" height="52" rx="8" fill="#150f22" stroke="#4c3a75"/>
+<text class="t" x="1142" y="152" fill="#c4b5fd" font-size="14" font-weight="600">Memory Bank</text>
+<text class="m" x="1142" y="170" fill="#7f9694" font-size="10.5">Firestore · runs, evidence, playbook</text>
 
-  <!-- controller -->
-  <rect x="526" y="160" width="175" height="76" rx="9" fill="#0d1a1e" stroke="#1c4a55"/>
-  <text class="t" x="613" y="190" fill="#eaf3f1" font-size="14.5" font-weight="600" text-anchor="middle">fleet_controller</text>
-  <text class="m" x="613" y="211" fill="#22d3ee" font-size="11.5" text-anchor="middle">Gemini 3.7</text>
-  <text class="m" x="613" y="227" fill="#4d6360" font-size="10.5" text-anchor="middle">resolve + decompose</text>
+<!-- ===== 1 EXECUTE ===== -->
+<line x1="48" y1="222" x2="1452" y2="222" stroke="#1a2426"/>
+<text class="m" x="48" y="243" fill="#34d399" font-size="11.5" letter-spacing="1.6">1 · EXECUTE</text>
+<text class="t" x="150" y="244" fill="#7f9694" font-size="13">Agents act asynchronously, inside enterprise controls.</text>
+<text class="m" x="1452" y="243" fill="#fb7185" font-size="10.5" text-anchor="end" letter-spacing="1.2">UNTRUSTED INPUT ↓</text>
 
-  <!-- workers -->
-  <rect x="729" y="160" width="195" height="76" rx="9" fill="#0d1a1e" stroke="#1c4a55"/>
-  <text class="t" x="826" y="188" fill="#eaf3f1" font-size="14.5" font-weight="600" text-anchor="middle">billing_agent · account_agent</text>
-  <text class="m" x="826" y="209" fill="#22d3ee" font-size="11.5" text-anchor="middle">Gemini 3.7</text>
-  <text class="m" x="826" y="226" fill="#4d6360" font-size="10.5" text-anchor="middle">one task each · scoped tools</text>
+<rect x="48" y="262" width="126" height="62" rx="8" fill="#101718" stroke="#243133"/>
+<text class="t" x="111" y="288" fill="#eaf3f1" font-size="13" font-weight="600" text-anchor="middle">Ticket</text>
+<text class="m" x="111" y="306" fill="#7f9694" font-size="10" text-anchor="middle">webhook · Pub/Sub</text>
 
-  <!-- policy gate -->
-  <rect x="952" y="160" width="185" height="76" rx="9" fill="#1a1408" stroke="#5c4610"/>
-  <text class="t" x="1044" y="186" fill="#fbbf24" font-size="14.5" font-weight="600" text-anchor="middle">Policy gate</text>
-  <text class="m" x="1044" y="206" fill="#a3a3a3" font-size="10.5" text-anchor="middle">kill switch · state gate</text>
-  <text class="m" x="1044" y="222" fill="#a3a3a3" font-size="10.5" text-anchor="middle">human approval</text>
-  <text class="m" x="1044" y="150" fill="#5c4610" font-size="10" text-anchor="middle">before every mutating call</text>
+<rect x="198" y="258" width="140" height="70" rx="8" fill="#1a1408" stroke="#8a6a12"/>
+<text class="t" x="268" y="286" fill="#fbbf24" font-size="13" font-weight="600" text-anchor="middle">Model Armor</text>
+<text class="m" x="268" y="303" fill="#a3a3a3" font-size="10" text-anchor="middle">injection screened</text>
+<text class="m" x="268" y="316" fill="#7f9694" font-size="9" text-anchor="middle">before any agent reads it</text>
 
-  <!-- tools -->
-  <rect x="1185" y="160" width="140" height="76" rx="9" fill="#101718" stroke="#243133"/>
-  <text class="t" x="1255" y="196" fill="#eaf3f1" font-size="14.5" font-weight="600" text-anchor="middle">Tools</text>
-  <text class="m" x="1255" y="216" fill="#7f9694" font-size="11" text-anchor="middle">mutate state</text>
 
-  <!-- firestore -->
-  <rect x="1373" y="160" width="185" height="76" rx="9" fill="#101718" stroke="#3f5a3f"/>
-  <text class="t" x="1465" y="190" fill="#eaf3f1" font-size="14.5" font-weight="600" text-anchor="middle">Firestore</text>
-  <text class="m" x="1465" y="211" fill="#7f9694" font-size="11.5" text-anchor="middle">system of record</text>
-  <text class="m" x="1465" y="227" fill="#4d6360" font-size="10.5" text-anchor="middle">+ evidence store</text>
+<!-- runtime wrapper -->
+<rect x="362" y="248" width="474" height="128" rx="10" fill="none" stroke="#1c4a55" stroke-dasharray="5 4"/>
+<text class="m" x="376" y="266" fill="#22d3ee" font-size="10.5" letter-spacing="1.2">AGENT RUNTIME · Cloud Run</text>
+<text class="m" x="828" y="266" fill="#4d6360" font-size="9.5" text-anchor="end">async · retries · model fallback 3.7→3.6→3.5</text>
 
-  <!-- band 1 arrows -->
-  <line x1="305" y1="198" x2="326" y2="198" stroke="#5c7573" stroke-width="1.6" marker-end="url(#a)"/>
-  <line x1="498" y1="198" x2="519" y2="198" stroke="#5c7573" stroke-width="1.6" marker-end="url(#a)"/>
-  <line x1="701" y1="198" x2="722" y2="198" stroke="#5c7573" stroke-width="1.6" marker-end="url(#a)"/>
-  <line x1="924" y1="198" x2="945" y2="198" stroke="#5c7573" stroke-width="1.6" marker-end="url(#a)"/>
-  <line x1="1137" y1="198" x2="1178" y2="198" stroke="#5c7573" stroke-width="1.6" marker-end="url(#a)"/>
-  <line x1="1325" y1="198" x2="1366" y2="198" stroke="#5c7573" stroke-width="1.6" marker-end="url(#a)"/>
+<rect x="380" y="278" width="192" height="80" rx="8" fill="#0d1a1e" stroke="#1c4a55"/>
+<text class="t" x="476" y="304" fill="#eaf3f1" font-size="13" font-weight="600" text-anchor="middle">fleet_controller</text>
+<text class="m" x="476" y="322" fill="#22d3ee" font-size="10" text-anchor="middle">Gemini 3.7</text>
+<text class="m" x="476" y="337" fill="#7f9694" font-size="9.5" text-anchor="middle">splits into typed tasks</text>
 
-  <!-- blocked branch off the gate -->
-  <path d="M1044,236 L1044,272 L1220,272" fill="none" stroke="#5c4610" stroke-width="1.5" stroke-dasharray="4 4" marker-end="url(#a)"/>
-  <text class="m" x="1232" y="276" fill="#fbbf24" font-size="11">blocked → reports &#8220;blocked&#8221;, nothing mutates</text>
+<rect x="596" y="278" width="222" height="80" rx="8" fill="#0d1a1e" stroke="#1c4a55"/>
+<text class="t" x="707" y="302" fill="#eaf3f1" font-size="12.5" font-weight="600" text-anchor="middle">billing_agent · account_agent</text>
+<text class="m" x="707" y="320" fill="#22d3ee" font-size="10" text-anchor="middle">Gemini 3.7</text>
+<text class="m" x="707" y="335" fill="#7f9694" font-size="9.5" text-anchor="middle">one task each · scoped tools</text>
 
-  <!-- ===== BAND 2 : VERIFY ===== -->
-  <text class="m" x="140" y="352" fill="#4d6360" font-size="12.5" letter-spacing="1.6">2 · VERIFY</text>
-  <text class="t" x="140" y="379" fill="#8fa6a3" font-size="15">The reconciliation every other agent stack skips.</text>
+<rect x="860" y="262" width="150" height="62" rx="8" fill="#101718" stroke="#3f4f52"/>
+<text class="t" x="935" y="284" fill="#cbd5d3" font-size="13" font-weight="600" text-anchor="middle">Agent Identity</text>
+<text class="m" x="935" y="301" fill="#7f9694" font-size="9.5" text-anchor="middle">typed · scoped tools</text>
+<text class="m" x="935" y="315" fill="#fbbf24" font-size="9" text-anchor="middle">partial: shared principal</text>
 
-  <!-- claim -->
-  <rect x="716" y="410" width="220" height="70" rx="9" fill="#141018" stroke="#3b2f52"/>
-  <text class="t" x="826" y="440" fill="#eaf3f1" font-size="14" font-weight="600" text-anchor="middle">Worker&#8217;s claim</text>
-  <text class="m" x="826" y="462" fill="#7f9694" font-size="11" text-anchor="middle">&#8220;done&#8221; + self-reported confidence</text>
+<rect x="1034" y="262" width="164" height="62" rx="8" fill="#1a1408" stroke="#8a6a12"/>
+<text class="t" x="1116" y="284" fill="#fbbf24" font-size="13" font-weight="600" text-anchor="middle">Policy Gateway</text>
+<text class="m" x="1116" y="301" fill="#a3a3a3" font-size="9.5" text-anchor="middle">kill · state gate · budget</text>
+<text class="m" x="1116" y="315" fill="#a3a3a3" font-size="9.5" text-anchor="middle">human approval</text>
 
-  <!-- state -->
-  <rect x="1355" y="410" width="220" height="70" rx="9" fill="#0f1613" stroke="#3f5a3f"/>
-  <text class="t" x="1465" y="440" fill="#eaf3f1" font-size="14" font-weight="600" text-anchor="middle">Actual state</text>
-  <text class="m" x="1465" y="462" fill="#7f9694" font-size="11" text-anchor="middle">read back from Firestore</text>
+<rect x="1222" y="262" width="230" height="62" rx="8" fill="#0f1613" stroke="#3f5a3f"/>
+<text class="t" x="1337" y="288" fill="#eaf3f1" font-size="13" font-weight="600" text-anchor="middle">Firestore</text>
+<text class="m" x="1337" y="306" fill="#34d399" font-size="10" text-anchor="middle">the real record</text>
 
-  <!-- feeds into claim / state -->
-  <path d="M826,236 L826,403" fill="none" stroke="#5c7573" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#a)"/>
-  <path d="M1465,236 L1465,403" fill="none" stroke="#5c7573" stroke-width="1.5" marker-end="url(#a)"/>
+<g stroke="#5c7573" stroke-width="1.5" fill="none">
+  <line x1="174" y1="293" x2="191" y2="293" marker-end="url(#a)"/>
+  <line x1="338" y1="293" x2="373" y2="293" marker-end="url(#a)"/>
+  <line x1="572" y1="318" x2="589" y2="318" marker-end="url(#a)"/>
+  <line x1="836" y1="293" x2="853" y2="293" marker-end="url(#a)"/>
+  <line x1="1010" y1="293" x2="1027" y2="293" marker-end="url(#a)"/>
+  <line x1="1198" y1="293" x2="1215" y2="293" marker-end="url(#a)"/>
+</g>
+<path d="M268,328 L268,348" fill="none" stroke="#8a6a12" stroke-width="1.4" stroke-dasharray="4 4"/>
+<text class="m" x="268" y="362" fill="#fbbf24" font-size="9.5" text-anchor="middle">blocked → dropped</text>
+<path d="M706,140 L706,130" fill="none" stroke="#22d3ee" stroke-width="0"/>
+<path d="M476,182 L476,271" fill="none" stroke="#22d3ee" stroke-width="1.4" stroke-dasharray="5 4" marker-end="url(#ac)"/>
+<text class="m" x="486" y="214" fill="#22d3ee" font-size="9.5">discovered from the registry</text>
 
-  <!-- gemma auditor -->
-  <rect x="716" y="530" width="220" height="66" rx="9" fill="#150f22" stroke="#4c3a75"/>
-  <text class="t" x="826" y="558" fill="#c4b5fd" font-size="14" font-weight="600" text-anchor="middle">Auditor · Gemma 4</text>
-  <text class="m" x="826" y="579" fill="#7f9694" font-size="10.5" text-anchor="middle">different model family · last resort</text>
+<!-- ===== 2 ATTEST ===== -->
+<line x1="48" y1="404" x2="1452" y2="404" stroke="#1a2426"/>
+<text class="m" x="48" y="425" fill="#34d399" font-size="11.5" letter-spacing="1.6">2 · ATTEST</text>
+<text class="t" x="150" y="426" fill="#7f9694" font-size="13">Compare the agent&#8217;s claim against reality. The step every other agent stack skips.</text>
 
-  <!-- verifier -->
-  <rect x="1055" y="510" width="230" height="106" rx="10" fill="#0c1a15" stroke="#34d399" stroke-width="1.6"/>
-  <text class="t" x="1170" y="546" fill="#34d399" font-size="17" font-weight="700" text-anchor="middle">Verifier</text>
-  <text class="m" x="1170" y="571" fill="#cbd5d3" font-size="11" text-anchor="middle">checks post-conditions</text>
-  <text class="m" x="1170" y="590" fill="#7f9694" font-size="10.5" text-anchor="middle">deterministic first,</text>
-  <text class="m" x="1170" y="605" fill="#7f9694" font-size="10.5" text-anchor="middle">model only if needed</text>
+<rect x="286" y="452" width="316" height="80" rx="9" fill="#141018" stroke="#5a4470"/>
+<text class="m" x="302" y="472" fill="#a78bfa" font-size="10" letter-spacing="1.1">AGENT CLAIM</text>
+<text class="t" x="302" y="497" fill="#eaf3f1" font-size="14" font-weight="600">&#8220;refund completed&#8221;</text>
+<text class="m" x="302" y="517" fill="#7f9694" font-size="10.5">self-reported confidence 0.95</text>
 
-  <!-- converge arrows -->
-  <path d="M900,480 C980,480 1000,505 1055,530" fill="none" stroke="#a78bfa" stroke-width="1.6" marker-end="url(#ap)"/>
-  <path d="M1400,480 C1320,480 1300,505 1285,530" fill="none" stroke="#34d399" stroke-width="1.6" marker-end="url(#ag)"/>
-  <line x1="936" y1="563" x2="1048" y2="563" stroke="#a78bfa" stroke-width="1.4" stroke-dasharray="4 4" marker-end="url(#ap)"/>
+<text class="t" x="646" y="503" fill="#fb7185" font-size="42" font-weight="700" text-anchor="middle">&#8800;</text>
 
-  <!-- outcomes -->
-  <rect x="1355" y="512" width="220" height="46" rx="8" fill="#0c1a15" stroke="#34d399"/>
-  <text class="t" x="1465" y="541" fill="#34d399" font-size="14" font-weight="600" text-anchor="middle">match → VERIFIED</text>
+<rect x="690" y="452" width="316" height="80" rx="9" fill="#0f1613" stroke="#3f5a3f"/>
+<text class="m" x="706" y="472" fill="#34d399" font-size="10" letter-spacing="1.1">REALITY · read from Firestore</text>
+<text class="t" x="706" y="497" fill="#eaf3f1" font-size="14" font-weight="600">state = pending_gateway</text>
+<text class="m" x="706" y="517" fill="#7f9694" font-size="10.5">money_moved = false</text>
 
-  <rect x="1355" y="576" width="220" height="46" rx="8" fill="#1c0f14" stroke="#fb7185"/>
-  <text class="t" x="1465" y="605" fill="#fb7185" font-size="14" font-weight="600" text-anchor="middle">mismatch → SILENT FAILURE</text>
+<path d="M444,532 C444,566 520,570 566,578" fill="none" stroke="#a78bfa" stroke-width="1.5" marker-end="url(#ap)"/>
+<path d="M848,532 C848,566 772,570 726,578" fill="none" stroke="#34d399" stroke-width="1.5" marker-end="url(#ag)"/>
 
-  <line x1="1285" y1="535" x2="1348" y2="535" stroke="#34d399" stroke-width="1.5" marker-end="url(#ag)"/>
-  <line x1="1285" y1="592" x2="1348" y2="592" stroke="#fb7185" stroke-width="1.5" marker-end="url(#ar)"/>
+<rect x="500" y="586" width="292" height="86" rx="10" fill="#0c1a15" stroke="#34d399" stroke-width="1.7"/>
+<text class="t" x="646" y="616" fill="#34d399" font-size="17" font-weight="700" text-anchor="middle">Verifier</text>
+<text class="m" x="646" y="637" fill="#cbd5d3" font-size="10.5" text-anchor="middle">deterministic post-conditions first</text>
+<text class="m" x="646" y="654" fill="#7f9694" font-size="10" text-anchor="middle">Gemma auditor only if no check exists</text>
 
-  <!-- ===== BAND 3 : GOVERN + LEARN ===== -->
-  <text class="m" x="140" y="700" fill="#4d6360" font-size="12.5" letter-spacing="1.6">3 · MEASURE &amp; LEARN</text>
+<rect x="880" y="580" width="240" height="42" rx="8" fill="none" stroke="#34d399"/>
+<text class="t" x="1000" y="607" fill="#34d399" font-size="14" font-weight="600" text-anchor="middle">match → verified</text>
+<rect x="880" y="634" width="240" height="46" rx="8" fill="#1c0f14" stroke="#fb7185"/>
+<text class="t" x="1000" y="663" fill="#fb7185" font-size="14" font-weight="700" text-anchor="middle">mismatch → SILENT FAILURE</text>
+<g stroke="#34d399" stroke-width="1.5" fill="none"><line x1="792" y1="601" x2="873" y2="601" marker-end="url(#ag)"/></g>
+<g stroke="#fb7185" stroke-width="1.5" fill="none"><line x1="792" y1="657" x2="873" y2="657" marker-end="url(#ar)"/></g>
 
-  <!-- playbook -->
-  <rect x="716" y="722" width="220" height="76" rx="9" fill="#150f22" stroke="#4c3a75"/>
-  <text class="t" x="826" y="752" fill="#c4b5fd" font-size="14" font-weight="600" text-anchor="middle">Playbook lesson</text>
-  <text class="m" x="826" y="773" fill="#7f9694" font-size="10.5" text-anchor="middle">injected into that worker&#8217;s</text>
-  <text class="m" x="826" y="788" fill="#7f9694" font-size="10.5" text-anchor="middle">next run — no prompt edit</text>
+<text class="m" x="1148" y="597" fill="#4d6360" font-size="10.5">an LLM judging another LLM</text>
+<text class="m" x="1148" y="613" fill="#4d6360" font-size="10.5">catches this at AUROC ≤ 0.65.</text>
+<text class="m" x="1148" y="629" fill="#a3b8b5" font-size="10.5">We read the state instead.</text>
 
-  <!-- metrics -->
-  <rect x="1055" y="722" width="230" height="76" rx="9" fill="#101718" stroke="#243133"/>
-  <text class="t" x="1170" y="750" fill="#eaf3f1" font-size="14" font-weight="600" text-anchor="middle">Metrics</text>
-  <text class="m" x="1170" y="770" fill="#7f9694" font-size="10.5" text-anchor="middle">reported vs verified · Brier / ECE</text>
-  <text class="m" x="1170" y="786" fill="#7f9694" font-size="10.5" text-anchor="middle">risk-coverage · escalation threshold</text>
+<!-- ===== 3 ADAPT ===== -->
+<line x1="48" y1="676" x2="1452" y2="676" stroke="#1a2426"/>
+<text class="m" x="48" y="697" fill="#34d399" font-size="11.5" letter-spacing="1.6">3 · ADAPT</text>
+<text class="t" x="150" y="698" fill="#7f9694" font-size="13">Verified failures become fleet memory, injected into the next run.</text>
 
-  <!-- dashboard -->
-  <rect x="1355" y="722" width="220" height="76" rx="9" fill="#0d1a1e" stroke="#1c4a55"/>
-  <text class="t" x="1465" y="752" fill="#eaf3f1" font-size="14" font-weight="600" text-anchor="middle">Operator dashboard</text>
-  <text class="m" x="1465" y="773" fill="#22d3ee" font-size="11" text-anchor="middle">Cloud Run</text>
-  <text class="m" x="1465" y="789" fill="#4d6360" font-size="10.5" text-anchor="middle">evidence trail per run</text>
+<rect x="286" y="722" width="316" height="76" rx="9" fill="#150f22" stroke="#4c3a75"/>
+<text class="t" x="444" y="750" fill="#c4b5fd" font-size="14" font-weight="600" text-anchor="middle">Playbook lesson</text>
+<text class="m" x="444" y="769" fill="#7f9694" font-size="10.5" text-anchor="middle">into that worker&#8217;s next instruction</text>
+<text class="m" x="444" y="785" fill="#7f9694" font-size="10.5" text-anchor="middle">no prompt edit</text>
 
-  <!-- silent failure feeds playbook + metrics -->
-  <path d="M1465,622 L1465,660 L826,660 L826,715" fill="none" stroke="#fb7185" stroke-width="1.5" marker-end="url(#ar)"/>
-  <path d="M1170,660 L1170,715" fill="none" stroke="#5c7573" stroke-width="1.5" marker-end="url(#a)"/>
-  <line x1="1285" y1="760" x2="1348" y2="760" stroke="#5c7573" stroke-width="1.5" marker-end="url(#a)"/>
+<rect x="646" y="722" width="316" height="76" rx="9" fill="#101718" stroke="#243133"/>
+<text class="t" x="804" y="750" fill="#eaf3f1" font-size="14" font-weight="600" text-anchor="middle">Metrics</text>
+<text class="m" x="804" y="769" fill="#7f9694" font-size="10.5" text-anchor="middle">reported vs verified · Brier / ECE</text>
+<text class="m" x="804" y="785" fill="#7f9694" font-size="10.5" text-anchor="middle">risk-coverage · escalation threshold</text>
 
-  <!-- feedback loop: playbook back up into workers, routed down the left channel -->
-  <path d="M716,760 L92,760 L92,128 L826,128 L826,153" fill="none" stroke="#4c3a75" stroke-width="1.6" stroke-dasharray="6 5" marker-end="url(#ap)"/>
+<rect x="1006" y="722" width="316" height="76" rx="9" fill="#0d1a1e" stroke="#1c4a55"/>
+<text class="t" x="1164" y="750" fill="#eaf3f1" font-size="14" font-weight="600" text-anchor="middle">Operator dashboard</text>
+<text class="m" x="1164" y="769" fill="#22d3ee" font-size="10.5" text-anchor="middle">Cloud Run</text>
+<text class="m" x="1164" y="785" fill="#7f9694" font-size="10.5" text-anchor="middle">evidence trail per run</text>
 
-  <!-- ===== info blocks, left column ===== -->
-  <text class="m" x="130" y="424" fill="#4d6360" font-size="11.5" letter-spacing="1.4">FAILURE TOLERANCE</text>
-  <text class="m" x="130" y="448" fill="#a3b8b5" font-size="12">model fallback cascade: 3.7 &#8594; 3.6 &#8594; 3.5-lite on a 503</text>
-  <text class="m" x="130" y="467" fill="#a3b8b5" font-size="12">every step logs which model actually served it</text>
-  <text class="m" x="130" y="486" fill="#a3b8b5" font-size="12">gate blocks state-inconsistent writes before they run</text>
-  <text class="m" x="130" y="505" fill="#a3b8b5" font-size="12">a worker sees only its own task, never the ticket &#8212;</text>
-  <text class="m" x="130" y="524" fill="#a3b8b5" font-size="12">which is what makes each claim independently checkable</text>
+<path d="M1000,680 L1000,700 L444,700 L444,715" fill="none" stroke="#fb7185" stroke-width="1.5" marker-end="url(#ar)"/>
+<path d="M804,700 L804,715" fill="none" stroke="#5c7573" stroke-width="1.4" marker-end="url(#a)"/>
+<line x1="962" y1="760" x2="999" y2="760" stroke="#5c7573" stroke-width="1.4" marker-end="url(#a)"/>
 
-  <text class="m" x="130" y="572" fill="#4d6360" font-size="11.5" letter-spacing="1.4">MEASURED, NOT CLAIMED</text>
-  <text class="m" x="130" y="596" fill="#a3b8b5" font-size="12">silent-failure rate of our own Gemini fleet, live on the board</text>
-  <text class="m" x="130" y="615" fill="#a3b8b5" font-size="12">eval harness injects faults against hidden ground truth,</text>
-  <text class="m" x="130" y="634" fill="#a3b8b5" font-size="12">so it scores the verifier as well as the workers</text>
+<!-- memory loop back into the runtime -->
+<path d="M286,760 L26,760 L26,392 L476,392 L476,364" fill="none" stroke="#a78bfa" stroke-width="1.5" stroke-dasharray="6 5" marker-end="url(#ap)"/>
+<text class="m" x="20" y="540" fill="#a78bfa" font-size="10.5" transform="rotate(-90 20 540)" text-anchor="middle">the fleet gets better without a prompt edit</text>
 
-  <!-- legend -->
-  <g transform="translate(130, 812)">
-    <circle cx="5" cy="-4" r="5" fill="#22d3ee"/><text class="m" x="18" y="0" fill="#7f9694" font-size="11.5">Gemini</text>
-    <circle cx="105" cy="-4" r="5" fill="#a78bfa"/><text class="m" x="118" y="0" fill="#7f9694" font-size="11.5">Gemma / learning</text>
-    <circle cx="270" cy="-4" r="5" fill="#34d399"/><text class="m" x="283" y="0" fill="#7f9694" font-size="11.5">verification path</text>
-    <circle cx="430" cy="-4" r="5" fill="#fbbf24"/><text class="m" x="443" y="0" fill="#7f9694" font-size="11.5">policy gate</text>
-    <circle cx="550" cy="-4" r="5" fill="#fb7185"/><text class="m" x="563" y="0" fill="#7f9694" font-size="11.5">silent failure caught</text>
-  </g>
-  <text class="m" x="1558" y="812" fill="#3d5250" font-size="11.5" text-anchor="end">github.com/rodriguescarson/attest-fleet</text>
+<!-- observability side channel -->
+<path d="M1474,293 L1474,820 M1474,293 L1474,190" fill="none" stroke="#1c4a55" stroke-width="1.3" stroke-dasharray="4 4"/>
+<path d="M1452,293 L1474,293 M1452,601 L1474,601 M1452,760 L1474,760" fill="none" stroke="#1c4a55" stroke-width="1.2" stroke-dasharray="3 3"/>
+<path d="M1474,196 L1474,186" fill="none" stroke="#22d3ee" stroke-width="1.3" marker-end="url(#ac)"/>
+<text class="m" x="1490" y="560" fill="#22d3ee" font-size="10" transform="rotate(-90 1490 560)" text-anchor="middle">every decision, every tool call</text>
+
+<!-- footer -->
+<text class="m" x="48" y="862" fill="#a3b8b5" font-size="11.5">Measured, not claimed: 40 tickets at a 30% injected fault rate — reported 0.525 vs verified 0.500, silent-failure 0.048, Brier 0.023.</text>
+<text class="m" x="1452" y="862" fill="#3d5250" font-size="11" text-anchor="end">github.com/rodriguescarson/attest-fleet</text>
 </svg>
