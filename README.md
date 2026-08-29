@@ -74,6 +74,9 @@ trigger ──► fleet_controller ──► billing_agent / account_agent ─�
                                  → injected into the worker's next instruction
 ```
 
+> **New here?** [`docs/EXPLAINER.md`](docs/EXPLAINER.md) is a plain-language walkthrough of the
+> whole system, including the numbers, the limitations and the judgement calls.
+
 ## What makes it different
 
 Every agent-observability tool grades the agent on what it **said** (traces, an LLM-judge).
