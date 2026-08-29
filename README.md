@@ -633,6 +633,30 @@ reached. See [docs/RESEARCH.md](docs/RESEARCH.md) for the mapping; in short:
   ICLR 2025, [2407.18370](https://arxiv.org/abs/2407.18370)); the escalation threshold is
   that operating point.
 
+### Confidence is a routing signal, not the authority
+
+This is worth stating plainly, because the two halves of this repo could otherwise be read
+as contradicting each other. The interpretability probe in `probe/` found that an agent's
+**stated confidence separates silent failure at roughly 0.54 AUROC** — a coin flip. So why
+does an escalation threshold exist at all?
+
+Because it decides a different question. Deterministic post-conditions decide **whether the
+outcome is real**; that verdict never consults confidence. The threshold decides only
+**what a human should look at first** among runs that are already verified or already
+flagged, and it is derived from the measured risk-coverage curve on this fleet rather than
+assumed to be meaningful. Where the curve shows confidence carries no signal, the threshold
+collapses and everything escalates, which is the correct behaviour rather than a failure.
+
+Two consequences the code already enforces:
+
+- **Irreversible actions escalate regardless of confidence.** `delete_account` always
+  requires a human, and the refund gate is a cumulative amount per order, not a confidence
+  score. Risk sets the gate; confidence never opens it.
+- **A confident claim cannot become a success.** The status is derived from what the
+  verifier found in the system of record, and `claim.outcome` sets `verified` on no path.
+
+Confidence orders the queue. The record decides the verdict.
+
 ## Prior work (disclosure)
 
 **No code from any prior project was incorporated.** Every line in this repository was

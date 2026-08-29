@@ -124,3 +124,15 @@ def test_the_agent_with_the_most_context_has_no_authority():
     from attest_fleet.contracts import contract_for
     assert contract_for("fleet_controller")["may_mutate"] == []
     assert contract_for("vision_reader")["may_call"] == []
+
+
+def test_both_stores_agree_on_list_ordering():
+    """A listing that means one thing in tests and another in production is worse than no
+    listing. MemoryStore returns oldest-first within its window; Firestore must match."""
+    from attest_fleet.store import FirestoreStore, MemoryStore
+    assert set(FirestoreStore._ORDER_BY) == {"runs", "events", "approvals"}
+    s = MemoryStore()
+    for i in range(5):
+        s.set("runs", f"r{i}", {"id": f"r{i}", "started_at": f"2026-08-2{i}T00:00:00Z"})
+    got = [r["id"] for r in s.list("runs", limit=3)]
+    assert got == ["r2", "r3", "r4"]  # the newest three, oldest-first within the window

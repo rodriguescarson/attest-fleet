@@ -120,9 +120,22 @@ class FirestoreStore(BaseStore):
             q = q.where(filter=self._firestore.FieldFilter(k, "==", v))
         return [{**s.to_dict(), "id": s.id} for s in q.stream()]
 
+    # Collections whose documents carry a timestamp worth ordering by. Without this,
+    # .limit(n) returns an ARBITRARY n documents, so "the newest runs" on the dashboard
+    # meant something different in production than in the in-memory tests, and the
+    # evidence trail could come back out of order. A verification system whose own
+    # listing is nondeterministic is not one to trust.
+    _ORDER_BY = {"runs": "started_at", "events": "ts", "approvals": "created_at"}
+
     def list(self, col, limit=100):
-        q = self._fs.collection(col).limit(limit)
-        return [{**s.to_dict(), "id": s.id} for s in q.stream()]
+        q = self._fs.collection(col)
+        field = self._ORDER_BY.get(col)
+        if field:
+            q = q.order_by(field, direction=self._firestore.Query.DESCENDING)
+        rows = [{**s.to_dict(), "id": s.id} for s in q.limit(limit).stream()]
+        # MemoryStore.list returns oldest-first within its window; match that so a caller
+        # cannot depend on an ordering that only holds for one backend.
+        return list(reversed(rows)) if field else rows
 
 
 _store: Optional[BaseStore] = None

@@ -676,7 +676,11 @@ async function loadMetrics(){
   if(fbEl) fbEl.innerHTML=fb.map(x=>`<div class="fb ${x.cls||""}"><div class="fbn">${esc(String(x.n))}</div><div class="fbl">${esc(x.l)}</div></div>`).join("");
   const e2=m.escalation;
   $("#escTxt").innerHTML = e2
-    ? `<b>Escalation policy:</b> route runs below confidence <b>${e2.threshold.toFixed(2)}</b> to a human. Auto-accept <b>${(e2.coverage*100).toFixed(0)}%</b> of claims at <b>${(e2.risk*100).toFixed(1)}%</b> residual silent-failure risk.`
+    /* Confidence is a routing signal, never the authority. Deterministic verification
+       decides the outcome; this threshold only decides what a human looks at first, and
+       it is derived from the measured risk-coverage curve rather than trusted a priori.
+       Irreversible actions escalate regardless of how confident the agent sounded. */
+    ? `<b>Escalation policy:</b> after verification, surface runs below confidence <b>${e2.threshold.toFixed(2)}</b> to a human first. At that line <b>${(e2.coverage*100).toFixed(0)}%</b> of claims carry <b>${(e2.risk*100).toFixed(1)}%</b> measured residual silent-failure risk. Confidence orders the queue; the record decides the verdict, and irreversible actions always escalate.`
     : "Escalation policy: not enough verified claims yet. Send a few tickets to <code>POST /tickets</code>.";
   $("#cRuns").textContent=m.runs||0;
 }
