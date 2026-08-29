@@ -484,7 +484,7 @@ button, [role="tab"], .iconbtn{touch-action:manipulation; -webkit-tap-highlight-
         <span class="probe-eyebrow">Interpretability probe &middot; representation-action gap</span>
         <a class="probe-link" href="https://github.com/rodriguescarson/attest-fleet/blob/main/probe/RESULTS.md" target="_blank" rel="noopener">method + reproduction &rarr;</a>
       </div>
-      <p class="probe-lead">On a surface-matched task, the agent's <b>stated confidence</b> cannot tell a silent failure from a success &mdash; but a linear probe on the model's <b>internal activations</b> can. The signal is in what the model represents, not what it says.</p>
+      <p class="probe-lead">On a task built so that surface text and stated confidence carry <b>no signal by construction</b>, the label is still linearly recoverable from the model's <b>internal activations</b>. The information is present internally even when it is absent from the output. A controlled demonstration on one small open model &mdash; not a measurement of production agents, whose calibration is the 40-ticket sweep above.</p>
       <div class="probe-bars">
         <div class="pb"><span class="pl">Probe on activations</span><span class="bar prb"><i style="--w:100%"></i></span><span class="pv hi">1.00</span></div>
         <div class="pb"><span class="pl">TF-IDF surface text</span><span class="bar"><i style="--w:53%"></i></span><span class="pv">0.53</span></div>

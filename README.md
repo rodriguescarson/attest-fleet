@@ -150,9 +150,9 @@ claim next to the rate.
 
 | Primitive | Status | How |
 |---|---|---|
-| **Agent Registry** | implemented | All five agents are published to Google's Agent Registry as A2A agent cards, one registry service each, with every tool indexed as a skill and tagged mutating or read-only (`scripts/register_agents.py`). `GET /fleet/identities` reads them back live and returns `{"source": "agent-registry", "count": 5, "agents": [...]}`, each agent carrying a `registry` block. It is not a hardcoded manifest; it falls back to the in-code list if the registry is unreachable. |
+| **Agent Registry** | implemented | All five agents are published to Google's Agent Registry as A2A agent cards, one registry service each, with every tool indexed as a skill (`scripts/register_agents.py`). `GET /fleet/identities` reads them back live and returns `{"source": "agent-registry", "count": 5, "agents": [...]}`. Two things to be precise about: the read is **joined onto** the in-code roster rather than replacing it, so `count` reflects the roster, and each skill currently inherits the **agent-level** mutates flag, so a read-only tool on a mutating agent is published tagged mutating. Falls back to the in-code list if the registry is unreachable. |
 | **Agent Runtime** | implemented | ADK agents on Cloud Run, Gemini served by Vertex AI. |
-| **Memory Bank** | implemented | Firestore holds the system of record, the evidence trail, and the playbook that carries lessons from a verified failure into the next run's instruction. |
+| **Memory Bank** | implemented, thin | Firestore holds the system of record, the evidence trail and the playbook. Be precise about the playbook: it is a **fixed table of six failure signatures** matched by substring in `experience.py`, not learned or generated memory, and it is empty on a fleet that has not yet failed in one of those six ways. Cross-session persistence is real; the intelligence is not. |
 | **Agent Gateway / guardrails** | implemented | `policy.py`: kill switch, deterministic pre-execution state gate, human approval on high-risk actions, tool-call ceiling and turn timeout. |
 | **Model Armor** | implemented | Ticket subject and body are screened by Google's Model Armor (template `attest-ticket-guard`, `asia-south1`) for prompt injection and jailbreak before any agent sees the text (`guard.py`). |
 | **Agent Observability** | implemented | ADK's OpenTelemetry GenAI spans export to Cloud Trace, next to an operator dashboard that measures correctness rather than traffic. |
@@ -272,7 +272,7 @@ added without a gate.
 
 | Requirement | Used |
 |---|---|
-| Gemini 3.5+ | `gemini-3.7-flash` on **Vertex AI** for the controller, both workers and vision intake |
+| Gemini 3.5+ | `gemini-3.7-flash` on **Vertex AI** for the controller, both workers, voice intake and vision intake. Voice is exercised on the live board; **vision has not yet run on a real ticket**, and the only vision run visible is sample data |
 | Google agent framework | Agent Development Kit (`google-adk` 2.7) — `LlmAgent`, tools, `output_schema`, tool callbacks |
 | Google Cloud infra | Cloud Run (service), Firestore (system of record + evidence store), Vertex AI (Gemini), Agent Registry (agent cards), Model Armor (ingress screening), Cloud Trace (OTel GenAI spans) |
 | Extra Google models (bonus) | **Gemma** (`gemma-4-31b-it`) as the independent auditor, reached through the **Gemini Developer API** because Gemma is not a Vertex publisher model, so the auditor differs from the workers in backend as well as model family; **Gemini vision** for image intake. Both motivated, not bolted on |
@@ -593,7 +593,9 @@ backend and the model ids the running revision actually resolved.
 
 ## Agent registry and identities
 
-`GET /fleet/identities` is a live read from Google's Agent Registry, not a hardcoded manifest.
+`GET /fleet/identities` is a live read from Google's Agent Registry, joined onto the in-code
+roster. The registry supplies each agent's version, indexed skills and agent id; the roster
+itself is still in code, so this is enrichment rather than a replacement.
 `scripts/register_agents.py` publishes all five agents as A2A agent cards, one registry service
 each, with every tool indexed as a skill and tagged mutating or read-only, so the registry
 itself records which agents can change state. The endpoint returns
@@ -644,15 +646,13 @@ reached. See [docs/RESEARCH.md](docs/RESEARCH.md) for the mapping; in short:
 
 ### Confidence is a routing signal, not the authority
 
-This is worth stating plainly, because the two halves of this repo could otherwise be read
-as contradicting each other. The interpretability probe in `probe/` found that an agent's
-**stated confidence separates silent failure at roughly 0.54 AUROC** — a coin flip. So why
-does an escalation threshold exist at all?
+Worth stating plainly, because a reviewer will ask why an escalation threshold exists at all
+in a project whose whole argument is that self-reports are not evidence.
 
-Because it decides a different question. Deterministic post-conditions decide **whether the
-outcome is real**; that verdict never consults confidence. The threshold decides only
-**what a human should look at first** among runs that are already verified or already
-flagged, and it is derived from the measured risk-coverage curve on this fleet rather than
+Because the threshold decides a different question from the verdict. Deterministic
+post-conditions decide **whether the outcome is real**, and that verdict never consults
+confidence on any path. The threshold decides only **what a human looks at first**, and it
+is derived from the measured risk-coverage curve on this fleet rather than
 assumed to be meaningful. Where the curve shows confidence carries no signal, the threshold
 collapses and everything escalates, which is the correct behaviour rather than a failure.
 
@@ -665,6 +665,13 @@ Two consequences the code already enforces:
   verifier found in the system of record, and `claim.outcome` sets `verified` on no path.
 
 Confidence orders the queue. The record decides the verdict.
+
+On the 40-ticket sweep the agents' stated confidence was in fact **well calibrated** against
+what the verifier found: Brier 0.023, ECE 0.033. That is the measurement that matters here,
+and it argues for using confidence as a queue-ordering signal rather than against it. The
+interpretability probe in `probe/` is a separate, narrower exercise on one small open model,
+and its controls are uninformative by construction — see `probe/RESULTS.md` before quoting
+any number from it.
 
 ## Prior work (disclosure)
 

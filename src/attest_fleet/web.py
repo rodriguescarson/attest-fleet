@@ -149,10 +149,15 @@ if config.ADK_UI:
 async def create_ticket(request: Request, background: BackgroundTasks) -> dict:
     """Enterprise trigger. Accepts a Ticket JSON body, or a Pub/Sub push envelope
     whose message.data is a base64 Ticket JSON."""
-    payload = await request.json()
-    if "message" in payload and "data" in payload["message"]:
-        payload = json.loads(base64.b64decode(payload["message"]["data"]).decode())
-    ticket = Ticket.model_validate(payload)
+    # A malformed body is a client error, not a server one. This is the first endpoint a
+    # technical reviewer touches, and a 500 there reads as a broken service.
+    try:
+        payload = await request.json()
+        if isinstance(payload, dict) and "message" in payload and "data" in payload["message"]:
+            payload = json.loads(base64.b64decode(payload["message"]["data"]).decode())
+        ticket = Ticket.model_validate(payload)
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(400, f"could not read a ticket from this body: {str(e)[:200]}")
     if request.query_params.get("wait") == "1":
         run = await run_ticket(ticket)
         return run.model_dump()

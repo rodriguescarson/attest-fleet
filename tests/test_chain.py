@@ -56,3 +56,20 @@ def test_runs_are_chained_independently():
     policy.record_event(run_id="other", kind="tool", name="x")
     other = s.query("events", run_id="other")[0]
     assert other["prev_hash"] == chain.GENESIS   # a separate run starts its own chain
+
+
+def test_unchained_events_are_not_quietly_excluded():
+    """Filtering out what cannot be checked and still reporting "intact" would be a
+    verification system returning a clean result over data it declined to verify."""
+    s, _ = _trail(3)
+    s.set("events", "evt_legacy", {"id": "evt_legacy", "run_id": "r", "kind": "experience",
+                                   "name": "lesson_captured", "ts": "2026-01-01T00:00:00Z"})
+    v = chain.verify_chain(s.query("events", run_id="r"))
+    assert v["intact"] is False
+    assert v["unchained"] == 1 and "evt_legacy" in v["unchained_ids"]
+    assert "unattested" in v["detail"]
+
+
+def test_an_empty_trail_says_nothing_is_attested():
+    v = chain.verify_chain([])
+    assert v["intact"] is None and "nothing here is attested" in v["detail"]

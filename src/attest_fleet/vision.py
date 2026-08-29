@@ -25,7 +25,9 @@ _client: genai.Client | None = None
 def _client_():
     global _client
     if _client is None:
-        _client = genai.Client(api_key=os.environ.get("GOOGLE_API_KEY"))
+        # Route like every other Gemini role. This was hardcoded to the Developer API,
+        # which is the free-tier path the fleet was moved off, and contradicted the README.
+        _client = genai.Client(**config.client_kwargs_for(config.VISION_MODEL))
     return _client
 
 

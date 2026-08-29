@@ -196,7 +196,9 @@ that does and does not license.
 
 The task is surface-controlled (`$490.00` requested vs `490.0` read back — same value,
 different tokens), so bag-of-words collapses to chance (0.53) and the agent's own
-confidence is at chance (0.54) — yet the model's **internal activations linearly separate
+confidence is at chance (0.54) **because the generator draws it independently of the
+label, so that control is uninformative by construction rather than by discovery** — yet
+the model's **internal activations linearly separate
 silent failures at 1.00**. The information to catch the failure is present in what the
 model *represents* and absent from what it *says*. That is the mechanistic case for
 Attest: read the state (deterministic verifier, shipping today) or the internals (probe,

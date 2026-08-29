@@ -38,6 +38,23 @@ and TF-IDF duly collapses to **0.533** — while the probe stays at **1.000**.
 
 ## The finding
 
+
+> **Read the two controls carefully — they are uninformative BY CONSTRUCTION, not by
+> discovery.** `gen_dataset.py` draws `confidence` from `rng.uniform(0.82, 0.99)` for every
+> example regardless of its label, and the hard mode deliberately surface-matches the text
+> so no token is class-diagnostic. So confidence landing at 0.54 and TF-IDF at 0.53 are
+> properties of the generator, not findings about agents. That is the correct design for
+> what this probe is for — it removes the shortcuts so the probe cannot win on them — but
+> it means **this experiment says nothing about whether real agents are well calibrated.**
+> The measurement that does is the 40-ticket sweep, where real agent confidence was scored
+> against real verification: Brier 0.023, ECE 0.033.
+>
+> What the probe does show, narrowly: on a task where surface features and the stated
+> confidence carry no signal by design, the label is still linearly recoverable from the
+> model's activations. The information is present internally even when it is absent from
+> the output. That is a controlled demonstration, on one small open model, not a claim
+> about production agents.
+
 On a task where **surface text (0.53) and the agent's own stated confidence (0.54) are
 both at chance**, a **linear probe on the model's activations separates silent failures
 at AUROC 1.00**. The information needed to catch the failure is **linearly present in the

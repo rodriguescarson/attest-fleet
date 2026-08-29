@@ -1,4 +1,13 @@
-"""Probe dataset generator. Default = HARD (surface-matched): the label is purely
+"""Probe dataset generator.
+
+NOTE ON THE CONTROLS. `confidence` below is drawn from the same distribution for both
+labels, and hard mode surface-matches the text so no token is class-diagnostic. Both
+controls are therefore uninformative BY CONSTRUCTION. That is deliberate: the point is to
+strip the shortcuts so a probe cannot win on them. It also means the reported
+confidence-at-chance number says nothing about whether real agents are calibrated, and must
+never be quoted as if it did. The real calibration measurement is the 40-ticket sweep.
+
+Default = HARD (surface-matched): the label is purely
 whether the read-back value equals the requested value. The requested amount appears
 as "$490.00" (2dp) and the read-back as "490.0" (1dp): same value, DIFFERENT tokens,
 so a bag-of-words model can't match across formats, and no single token is class-

@@ -94,3 +94,13 @@ def test_dangerous_endpoints_are_not_advertised(monkeypatch):
         paths = c.get("/openapi.json").json()["paths"]
         assert "/fleet/fault" not in paths and "/tickets/batch" not in paths
         assert "/tickets" in paths  # what a reviewer does need stays documented
+
+
+def test_a_malformed_ticket_body_is_a_client_error(client):
+    """A 500 on the first endpoint a reviewer touches reads as a broken service."""
+    c, _ = client
+    r = c.post("/tickets", content=b"not json", headers={"X-Attest-Token": TOKEN,
+                                                         "content-type": "application/json"})
+    assert r.status_code == 400
+    r2 = c.post("/tickets", json={"nope": 1}, headers={"X-Attest-Token": TOKEN})
+    assert r2.status_code == 400

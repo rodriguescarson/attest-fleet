@@ -76,8 +76,10 @@ def verify_chain(events: list[dict[str, Any]]) -> dict[str, Any]:
     Returns the verdict plus the first event whose link does not hold, so a break is
     located rather than merely announced."""
     chained = _ordered(events)
+    unchained = [e for e in events if not e.get("hash")]
     if not chained:
-        return {"intact": None, "checked": 0, "detail": "no chained events in this run"}
+        return {"intact": None, "checked": 0, "unchained": len(unchained),
+                "detail": "no chained events in this run; nothing here is attested"}
 
     prev = GENESIS
     for i, e in enumerate(chained):
@@ -90,7 +92,18 @@ def verify_chain(events: list[dict[str, Any]]) -> dict[str, Any]:
                     "detail": f"event {e.get('id')} does not match its own hash; its contents changed"}
         prev = e["hash"]
 
-    return {"intact": True, "checked": len(chained), "head": prev,
+    # An unchained event is rendered in the package as evidence but cannot be attested.
+    # Filtering it out and still returning "intact" would be a verification system
+    # reporting a clean result over data it declined to check, which is the precise
+    # failure this project exists to catch.
+    if unchained:
+        return {"intact": False, "checked": len(chained), "unchained": len(unchained),
+                "head": prev,
+                "unchained_ids": [e.get("id") for e in unchained][:10],
+                "detail": f"{len(chained)} events link correctly, but {len(unchained)} carry "
+                          "no hash and are therefore unattested; the trail is not fully covered"}
+
+    return {"intact": True, "checked": len(chained), "unchained": 0, "head": prev,
             "detail": "every event links to the one before it",
             "scope": "tamper-evident against record edits; the service writes the chain, "
                      "so it is not proof against a compromised writer"}
