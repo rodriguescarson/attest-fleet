@@ -13,7 +13,7 @@ import time
 from typing import Any, Optional
 
 from . import config
-from .domain import Approval, Event
+from .domain import Approval, Event, now_iso
 from .store import get_store
 from .tools import MUTATING
 
@@ -99,6 +99,30 @@ def reset_tool_budget(run_id: str, task_id: str = "") -> None:
     _tool_calls.pop(f"{run_id}:{task_id}", None)
 
 
+def _prior_result(store, run_id: str, task_id: Optional[str], tool_name: str, args: dict[str, Any]) -> Optional[dict]:
+    """The recorded result of an identical, already-successful call in this task, if any.
+
+    Matched on the argument fingerprint, which excludes run_id, so a replay of the same
+    logical action is recognised even though the retry is a different agent turn."""
+    if not run_id:
+        return None
+    fp = args_fingerprint(tool_name, args)
+    for e in store.query("events", run_id=run_id):
+        if e.get("kind") != "tool" or e.get("name") != tool_name or e.get("task_id") != task_id:
+            continue
+        try:
+            if args_fingerprint(tool_name, json.loads(e.get("args_json") or "{}")) != fp:
+                continue
+            result = json.loads(e.get("result_json") or "null")
+        except ValueError:
+            continue
+        if isinstance(result, dict) and result.get("status") == "success":
+            return {**result, "idempotent_replay": True,
+                    "instruction": "This exact action already completed earlier in this task. "
+                                   "It was NOT run again. Treat it as done and do not retry it."}
+    return None
+
+
 def before_tool(tool, args: dict[str, Any], tool_context) -> Optional[dict]:
     store = get_store()
     state = tool_context.state
@@ -108,7 +132,8 @@ def before_tool(tool, args: dict[str, Any], tool_context) -> Optional[dict]:
     agent = getattr(tool_context, "agent_name", None)
 
     # Tools that mutate take the run id so fault injection is reproducible per run.
-    if tool.name in MUTATING and "run_id" in getattr(tool, "func", lambda: None).__code__.co_varnames if hasattr(tool, "func") else False:
+    func = getattr(tool, "func", None)
+    if tool.name in MUTATING and func is not None and "run_id" in func.__code__.co_varnames:
         args["run_id"] = run_id
 
     # Loop containment. Counted across EVERY tool, not just mutating ones: the runaway
@@ -123,6 +148,23 @@ def before_tool(tool, args: dict[str, Any], tool_context) -> Optional[dict]:
         return {"status": "blocked",
                 "reason": f"tool-call budget of {config.MAX_TOOL_CALLS_PER_TASK} exhausted for this task",
                 "instruction": "You are looping. Stop calling tools. Report outcome='failed' with this reason. Do not claim the task is done."}
+
+    # Idempotency. run_agent retries a whole agent turn on any exception, including one
+    # raised AFTER a tool already committed to the store: a timeout mid-turn, or a schema
+    # validation failure on the worker's final answer. The retry starts a fresh session and
+    # the worker calls the same tool again, so a refund small enough to stay inside the
+    # remaining balance and under the approval limit gets paid twice, silently.
+    #
+    # Every tool call is already persisted with its arguments, so the replay is detectable:
+    # if this exact call already succeeded for this task, return the recorded result rather
+    # than executing it again. The worker sees what it saw the first time.
+    if tool.name in MUTATING:
+        prior = _prior_result(store, run_id, task_id, tool.name, args)
+        if prior is not None:
+            record_event(run_id=run_id, task_id=task_id, agent=agent, kind="policy", name="idempotent_replay",
+                         args_json=json.dumps({"tool": tool.name, "args": args}, default=str),
+                         result_json=json.dumps(prior, default=str)[:2000])
+            return prior
 
     if tool.name in MUTATING and store.get_setting("kill_switch", False):
         record_event(run_id=run_id, task_id=task_id, agent=agent, kind="policy", name="kill_switch_block",
@@ -158,8 +200,12 @@ def before_tool(tool, args: dict[str, Any], tool_context) -> Optional[dict]:
                          args_json=json.dumps({"tool": tool.name, "args": args, "approval_id": apr_id}, default=str))
             return {"status": "pending_approval", "approval_id": apr_id, "reason": reason,
                     "instruction": "A human must approve this action. Report outcome='blocked' with this approval id. Do not claim the task is done."}
+        # Single-use. An approval is permission for ONE action, not a standing capability:
+        # left reusable, a replayed ticket could spend the same approved refund again.
+        store.update("approvals", approved[0]["id"],
+                     {"status": "consumed", "consumed_at": now_iso(), "consumed_by_run": run_id})
         record_event(run_id=run_id, task_id=task_id, agent=agent, kind="policy", name="approval_honoured",
-                     args_json=json.dumps({"tool": tool.name, "approval_id": approved[0]["id"]}, default=str))
+                     args_json=json.dumps({"tool": tool.name, "approval_id": approved[0]["id"], "consumed": True}, default=str))
 
     _t0[getattr(tool_context, "function_call_id", None) or f"{run_id}:{tool.name}"] = time.perf_counter()
     return None

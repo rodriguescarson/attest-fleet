@@ -185,3 +185,52 @@ def test_split_refunds_cannot_evade_the_approval_threshold(store):
         raise AssertionError(f"structured refunds moved {moved} with no approval")
     assert moved <= config.REFUND_APPROVAL_THRESHOLD
     assert store.query("approvals", status="pending")
+
+
+def test_a_retried_tool_call_is_not_executed_twice(store):
+    """run_agent retries a whole agent turn on any exception, including one raised after a
+    tool already committed. Without an idempotency guard the worker calls the same tool
+    again and a refund under both the balance and the approval limit is paid twice."""
+    tool = SimpleNamespace(name="issue_refund")
+    ctx = _ctx(run_id="r", ticket_id="tk", task_id="t")
+    policy.reset_tool_budget("r", "t")
+    args = {"order_id": "ord_5003", "amount": 40.0, "reason": "x"}
+
+    assert policy.before_tool(tool, dict(args), ctx) is None
+    first = issue_refund(**dict(args, run_id="r"))
+    policy.after_tool(tool, dict(args), ctx, first)
+    assert store.get("orders", "ord_5003")["refunded"] == 40.0
+
+    replay = policy.before_tool(tool, dict(args), ctx)          # the retry
+    assert replay is not None and replay.get("idempotent_replay") is True
+    assert store.get("orders", "ord_5003")["refunded"] == 40.0  # still 40, not 80
+    assert any(e["name"] == "idempotent_replay" for e in store.list("events", limit=200))
+
+
+def test_an_approval_is_single_use(store):
+    """An approval is permission for one action, not a standing capability."""
+    tool = SimpleNamespace(name="issue_refund")
+    args = {"order_id": "ord_5003", "amount": 490.0, "reason": "x"}
+    ctx = _ctx(run_id="r", ticket_id="tk", task_id="t")
+    policy.reset_tool_budget("r", "t")
+    res = policy.before_tool(tool, dict(args), ctx)
+    store.update("approvals", res["approval_id"], {"status": "approved"})
+
+    policy.reset_tool_budget("r", "t2")
+    assert policy.before_tool(tool, dict(args), _ctx(run_id="r", ticket_id="tk", task_id="t2")) is None
+    assert store.get("approvals", res["approval_id"])["status"] == "consumed"
+
+    # replayed on a fresh task: the consumed approval no longer authorises it
+    policy.reset_tool_budget("r2", "t3")
+    again = policy.before_tool(tool, dict(args), _ctx(run_id="r2", ticket_id="tk", task_id="t3"))
+    assert again is not None and again["status"] == "pending_approval"
+
+
+def test_delete_account_has_a_deterministic_post_condition(store):
+    """The one irreversible action must not depend on an LLM auditor."""
+    from attest_fleet.verifier import POSTCONDITIONS
+    assert "delete_account" in POSTCONDITIONS
+    task = Task(id="t9", type="delete_account", worker="account_agent", customer_id="cus_1001",
+                instruction="", rationale="")
+    v = verify(store, task, claim("t9", "done"))
+    assert v.method == "postcondition" and v.verified is False and v.silent_failure is True

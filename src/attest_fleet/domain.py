@@ -20,7 +20,7 @@ def new_id(prefix: str) -> str:
     return f"{prefix}_{uuid4().hex[:10]}"
 
 
-TaskType = Literal["refund", "address_change", "cancel_subscription", "unlock_account", "other"]
+TaskType = Literal["refund", "address_change", "cancel_subscription", "unlock_account", "delete_account", "other"]
 WorkerName = Literal["billing_agent", "account_agent"]
 Outcome = Literal["done", "failed", "blocked"]
 

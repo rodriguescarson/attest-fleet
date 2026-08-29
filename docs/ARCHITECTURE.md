@@ -57,10 +57,23 @@ flowchart TB
 
 ## Why the topology matters for scoring
 
-- **Decoupling (30% Architectural Discipline).** Workers never talk to each other and never see the
-  ticket — the controller hands each one an isolated `Task`. That isolation is what makes a per-task
-  claim independently verifiable. Skill/tool/state are separate concerns (ADK tools, policy callbacks,
-  Firestore), not collapsed into prompt strings.
+- **Decoupling (30% Architectural Discipline).** The topology is an orchestrator with
+  context-isolated workers and single-threaded writes: `fleet.run_ticket` walks the plan in a
+  sequential `for` loop, the controller is the only component that sees the whole ticket and it
+  holds read-only tools, and each worker gets one isolated `Task` plus a fresh session carrying
+  only ids. Workers never talk to each other and never see the ticket. Write scopes are disjoint
+  by construction (`billing_agent` has no address or cancellation tool, `account_agent` has no
+  refund tool; `record_note` is the only mutating tool they share), so the split buys bounded
+  authority and a per-action verdict rather than throughput. That isolation is what makes a
+  per-task claim independently verifiable. Skill/tool/state are separate concerns (ADK tools,
+  policy callbacks, Firestore), not collapsed into prompt strings.
+- **Failure tolerance in the routing (same criterion).** A worker that loops is capped by a
+  per-task tool-call budget in `policy.before_tool`; one that stalls is cut off by a wall-clock
+  timeout in `fleet.run_agent`; a model that errors or returns unparseable output is retried down
+  a model chain with an idempotency guard on mutating calls; and one that claims a success it did
+  not achieve is caught by the post-condition verifier and turned into a playbook lesson. The
+  four are laid out in the
+  [README](../README.md#if-a-worker-loops-stalls-or-hallucinates-a-success).
 - **Beyond chat (40% Operational Utility).** The trigger is an enterprise event (webhook/Pub/Sub), the
   fleet executes real mutations against a system of record, and high-risk actions are gated and
   reversible. No chat box anywhere.

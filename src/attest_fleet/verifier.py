@@ -65,8 +65,25 @@ def _unlock_checks(store: BaseStore, task: Task) -> list[Check]:
     return [Check(name="account_unlocked", passed=c.get("locked") is False, detail=f"locked={c.get('locked')}")]
 
 
+def _delete_checks(store: BaseStore, task: Task) -> list[Check]:
+    """Account deletion is the only irreversible action in the fleet, and it was the only
+    one with no deterministic check — so it fell through to the LLM auditor, the very thing
+    this project cites research against. Read the record instead."""
+    cid = task.customer_id or ""
+    cust = store.get("customers", cid)
+    gone = cust is None or bool(cust.get("deleted"))
+    checks = [Check(name="customer_deleted", passed=gone,
+                    detail="customer record absent" if cust is None
+                    else f"customer.deleted={cust.get('deleted', False)}")]
+    active = [s for s in store.query("subscriptions", customer_id=cid) if s.get("status") == "active"]
+    checks.append(Check(name="no_active_subscriptions", passed=not active,
+                        detail=f"{len(active)} active subscription(s) remain"))
+    return checks
+
+
 POSTCONDITIONS = {
     "refund": _refund_checks,
+    "delete_account": _delete_checks,
     "address_change": _address_checks,
     "cancel_subscription": _cancel_checks,
     "unlock_account": _unlock_checks,

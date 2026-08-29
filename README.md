@@ -95,6 +95,33 @@ trigger ──► fleet_controller ──► billing_agent / account_agent ─�
 
 ## What makes it different
 
+> Benchmark-grade state verification, lifted out of the offline eval harness and into a
+> runtime control plane over a live fleet, reporting two things no agent framework reports:
+> a silent-failure rate, and calibration on the agent's own confidence.
+
+Checking an agent against the end state of a system of record is not new. τ-bench did it in
+2024 and every serious agent benchmark since has done a version of it. The claim here is
+narrower: that check belongs at runtime, on a fleet that is under policy and actually mutating
+a production record, and its output belongs on an operator dashboard as a rate rather than in
+a paper as a score. Two facts hold that up.
+
+**The framework this is built on does not do it.** ADK's eval criteria
+([adk.dev/evaluate/criteria](https://adk.dev/evaluate/criteria), enumerated as
+`PrebuiltMetrics` in `google/adk/evaluation/eval_metrics.py` at 2.7.1) are one trajectory-match
+metric, one ROUGE overlap metric and eleven LLM-judge metrics. Not one of them reads a system
+of record. Even `hallucinations_v1`, the metric closest to this problem, grounds each sentence
+of the answer against a context string assembled from the developer instructions, the user
+query, the tool declarations and the tool outputs, which is the transcript. A run whose
+transcript is internally consistent and whose refund never moved scores clean. That is a gap in
+the framework, not a gap in the framework's documentation.
+
+**Someone else measured what closing it is worth.** Advani
+([2606.09863](https://arxiv.org/abs/2606.09863)) reports false success at 45-48% of all failures
+in single-control τ²-bench domains against ~3% in the dual-control telecom domain, where an
+independent channel can check state: roughly a 15x suppression. It is a cross-domain comparison
+rather than a controlled intervention, which the paper says plainly, and it is still the largest
+published effect on this failure mode.
+
 Every agent-observability tool grades the agent on what it **said** (traces, an LLM-judge).
 LLM-judge evaluation catches false success at **AUROC ≤ 0.65** — barely above chance (Advani,
 2606.09863). Attest Fleet grades the agent on what actually **changed in the system of record**,
@@ -104,6 +131,11 @@ the ticket text at ingress, ADK agents run on **Cloud Run** with Gemini on **Ver
 **Agent Registry** publishes the fleet, **Attest verifies against Firestore**, and the OTel GenAI
 spans export to **Cloud Trace**. None of those verify, at runtime, that a claimed outcome is
 real. That is the layer Attest adds.
+
+Kept honest: post-condition verification is table stakes in benchmark research, and none of
+the statistics here are novel. What is uncommon is running the check at runtime against the
+live record, on a fleet that is under a policy gate, and publishing the calibration of the
+claim next to the rate.
 
 ### Where the fleet stands on the Fortified Enterprise Fleet primitives
 
@@ -125,6 +157,107 @@ decision. It **fails open** on purpose: if the guard is unreachable the ticket s
 because the verifier, the pre-execution state gate and the approval gate all still apply
 downstream, and dropping real customer tickets because a screening API blipped is the worse
 failure. Guard errors are logged too, so a fail-open is visible rather than silent.
+
+## Separation of concerns: one controller, isolated workers, single-threaded writes
+
+The topology is an orchestrator with context-isolated, ephemeral subagents, and it is enforced
+in `fleet.py` rather than left to the models:
+
+- **Writes are single-threaded.** `run_ticket` walks `plan.tasks` in a plain sequential `for`
+  loop. There is no fan-out, no concurrent worker, no shared scratchpad. Every mutation of the
+  system of record happens on one thread of control, in plan order.
+- **The component with the most context has the least authority.** `fleet_controller` is the
+  only thing that sees the whole ticket, and it is built with `tools.READ_TOOLS` only, so it
+  cannot mutate anything. It decomposes, resolves the customer, and hands work down.
+- **Each worker sees one task and nothing else.** `_task_prompt` gives the worker its `Task` as
+  JSON and nothing more, and `run_agent` builds a fresh `InMemorySessionService` session whose
+  state is only `run_id`, `ticket_id` and `task_id`. A worker never sees the ticket text, the
+  plan, the sibling tasks, or another worker's claim. It cannot address another agent at all:
+  there is no transfer edge and no sub-agent in the production path (`build_chat_fleet`, the
+  `adk web` demo, is the one place workers are sub-agents, and it does not verify).
+- **Write scopes are disjoint by construction.** `billing_agent` holds `issue_refund` and has no
+  way to reach `update_address`, `cancel_subscription`, `unlock_account` or `delete_account`;
+  `account_agent` holds those and cannot issue a refund (`tools.BILLING_TOOLS` vs
+  `tools.ACCOUNT_TOOLS`). The one mutating tool both hold is `record_note`, which appends an
+  annotation and touches no field a post-condition reads.
+
+That arrangement is what several groups converged on over 2026: an orchestrator with
+context-isolated subagents, and writes kept single-threaded. Cognition put it directly:
+"multi-agent systems work best today when writes stay single-threaded and the additional
+agents contribute intelligence rather than actions" (Walden Yan, [Multi-Agents: What's
+Actually Working](https://cognition.com/blog/multi-agents-working), April 2026).
+
+**So why multi-agent at all?** Not for capability, and it is worth saying so before a reviewer
+does. Anthropic reports multi-agent systems using about **15x more tokens than chat
+interactions**, against about 4x for a single agent
+([How we built our multi-agent research system](https://www.anthropic.com/engineering/multi-agent-research-system)),
+so the premium over one agent is roughly 4x rather than 15x. And Tran and Kiela
+([arXiv 2604.02460](https://arxiv.org/abs/2604.02460)) find single agents matching or beating
+multi-agent systems on multi-hop reasoning once the thinking-token budget is held constant. The
+split has to pay for itself somewhere other than performance. Here it pays in governance:
+
+- **Least privilege.** Two workers with disjoint mutating tools means a prompt-injected or
+  confused `billing_agent` has no address-change tool to be talked into calling. One agent
+  holding every tool has a blast radius equal to the whole tool list, whatever its instruction
+  says.
+- **Verifiability.** One task, one claim, one post-condition. A single agent that did the refund
+  and the address change inside one trajectory emits one "done" that cannot be scored against
+  two different post-conditions, and a partial success reads as either a total success or a
+  total failure. Splitting the ticket is what makes each outcome independently checkable, which
+  is why the controller is instructed to emit one task per distinct ask rather than merging them.
+
+The cost is real: a two-task ticket runs three model turns instead of one. The fleet buys
+bounded authority and a per-action verdict with those tokens, which is the trade a governed
+deployment should want.
+
+## If a worker loops, stalls or hallucinates a success
+
+Four distinct failures, four distinct answers, all of them in code today:
+
+- **A worker that loops on tool calls.** `config.MAX_TOOL_CALLS_PER_TASK` (12) is enforced in
+  `policy.before_tool`, the same gate that enforces the kill switch and the approval rules. It
+  counts **every** tool call, not
+  only the mutating ones, because the runaway case is a worker that spins on reads and never
+  concludes. The budget is per task (`policy.reset_tool_budget` runs at the top of each task in
+  `fleet.run_ticket`), so a legitimately multi-step task is unaffected. On exhaustion it **fails
+  closed**: the tool does not execute, a `loop_guard` event goes to the evidence trail, and the
+  worker gets back an instruction to report `failed` and stop, never `done`.
+- **A worker that stalls without raising.** `config.AGENT_TURN_TIMEOUT_S` (90s) wraps the entire
+  ADK event stream in `asyncio.wait_for` inside `fleet.run_agent`. Without it, an agent that
+  neither finishes nor raises runs until the Cloud Run request timeout. The timeout surfaces as
+  an ordinary exception, so it lands in the retry path below instead of needing a recovery branch
+  of its own.
+- **A model that errors, rate-limits or returns unparseable output.** `run_agent` retries the
+  turn up to four attempts and walks `config.MODEL_CHAINS` as it goes:
+  `gemini-3.7-flash` → `gemini-3.6-flash` → `gemini-3.5-flash`. Every attempt logs the model
+  that served it, so the evidence trail says which rung answered. Structured output is validated
+  against the Pydantic schema, so a malformed claim is a retry rather than a bad claim entering
+  the store. Because a retry can follow a tool call that already committed, `policy.before_tool`
+  fingerprints mutating calls and returns the recorded result of an identical earlier success
+  instead of executing it twice (`idempotent_replay`); without that, a retried turn pays a refund
+  again, silently.
+- **A worker that confidently claims a success that never happened.** The three guards above
+  contain a runaway, and not one of them catches this, because from the worker's point of view
+  nothing went wrong. `verifier.py` re-reads the system of record after the turn and checks the
+  post-conditions the task type implies: `status == "cancelled"`, `order.refunded` equals the
+  requested amount with no refund left in `pending_gateway`, `customer.address` equals the
+  requested address. A `done` claim against a failing post-condition is recorded as a
+  `silent_failure`, and `experience.capture` distils it into a playbook lesson keyed by failure
+  signature, which `agents._worker_instruction` injects into **that worker's** instruction on its
+  next run.
+
+Containment stops the runaway, verification catches the confident-but-wrong, and both leave
+evidence: `loop_guard`, `gate_block`, `kill_switch_block`, `approval_required`,
+`idempotent_replay` and the per-attempt model events all land in the same `events` collection
+the dashboard and the eval harness read.
+
+One implementation note, since a Google reviewer will notice it. `policy.py` attaches the
+guardrails as per-agent ADK callbacks (`before_tool_callback` / `after_tool_callback`, wired in
+`agents.build_worker`). ADK's current callbacks guidance points security guardrails and policy
+at **Plugins**, which register once on the runner and apply to every agent in the app. Behaviour
+is identical today because both workers come from one factory, but the Plugin is the idiomatic
+home for a fleet-wide policy, and the callback wiring is a place where a sixth agent could be
+added without a gate.
 
 ## Stack (hackathon gate)
 
@@ -275,12 +408,12 @@ and `account_agent`, and each task is verified independently.
 | Tickets dispatched / no result | 40 / **0** | every ticket ran to a verdict |
 | Reported success rate | **0.525** | 21 of 40 tasks claimed done, on the agents' own scoreboard |
 | Verified success rate | **0.500** | 20 of 40 held in the system of record |
-| **Silent-failure rate** | **0.0476** | 1 of the 21 "done" claims was false, and invisible to the agents |
+| **Silent-failure rate** | **0.0476** | 1 of the 21 "done" claims was false, and invisible to the agents. n = 21, so the Wilson 95% interval is **[0.008, 0.227]** |
 | False-alarm rate | 0.00 | no run cried failure that was actually fine |
 | Brier / ECE | **0.023** / **0.0328** | calibration of the claim, over 40 pairs |
 | Escalation threshold | **0.98** | auto-accept 20 of the 21 "done" claims (**95.2%** coverage) at **0%** residual silent-failure risk; escalate the rest to a human |
 | Eval ground-truth pass rate | 0.65 | 26 of 40 runs ended in the exact end state the harness expected |
-| Verifier blind spots | **2** | 2 of 40 runs where the verifier's verdict disagreed with hidden ground truth |
+| Verifier blind spots | **2** | 2 of 40 runs where the verifier's verdict disagreed with hidden ground truth. The harness grades the checker, not only the workers |
 
 Run outcomes: **20 verified, 8 pending approval, 11 failed, 1 silent failure.** The gap
 between reported (0.525) and verified (0.500) success is still the point: without Attest the
@@ -298,14 +431,23 @@ larger sweep does not support it as a general figure. Both sweeps are kept here:
 | 2026-08-28, 40 tickets, 30% fault rate | `gemini-3.7-flash` on Vertex AI | 40 | 21 | 1 | **0.048** |
 | 2026-08-25, 10 tickets, 35% fault rate | `gemini-3.5-flash-lite` on the Developer API free tier | **5** (4 of 10 tickets produced no result at all, truncated by the 15 req/min cap and 503 demand-shedding) | 4 | 1 | **0.25** |
 
-The rate fell by roughly a factor of five when the model tier changed, and it did not fall to
-zero. That is the finding. **You cannot know your own silent-failure rate without measuring
+Both point estimates carry wide intervals at these denominators. 1 of 21 is 0.048 with a Wilson
+95% interval of **[0.008, 0.227]**; 1 of 4 is 0.25 with **[0.046, 0.699]**. They overlap, so the
+pair is two operating points measured on two model tiers, not a measured five-fold effect, and
+the headline 0.048 should be read as "somewhere between about 1% and about 23%, on this model,
+this workload and this fault rate". Reporting the interval is the point: a silent-failure rate
+quoted to three decimals off 21 samples would be the same overconfidence this project exists to
+catch.
+
+The point estimate fell by roughly a factor of five when the model tier changed, and it did not
+reach zero on either. **You cannot know your own silent-failure rate without measuring
 it, and the rate you measured last quarter is not the rate you have today**, because the model
 underneath you moves. It is an argument for the measurement layer being permanent, not for any
 single number being alarming.
 
 Two caveats stay attached to the new figure. 21 claimed-done tasks is still a small
-denominator: one more or one fewer silent failure moves the rate by about five points. And the
+denominator, which is what the interval above is saying: one more or one fewer silent failure
+moves the point estimate by about five points. And the
 two sweeps differ in fault rate (30% vs 35%) as well as in model and backend, so this is a
 comparison of two operating points, not a controlled ablation.
 
@@ -324,9 +466,9 @@ confidence, and the deterministic post-condition (`status == cancelled`) caught 
 
 #### The harness scores the verifier too
 
-Each eval ticket carries hidden ground truth that never reaches an agent, and
-`verifier_blind_spots` counts runs where the runtime verifier said "verified" and ground truth
-disagreed. On this sweep that is **2 of 40**, and both are the same trap: the deliberately
+The harness does not only score the workers. It scores the checker: every eval ticket carries
+hidden ground truth that never reaches an agent, and `verifier_blind_spots` counts the runs where
+the runtime verifier said "verified" and ground truth disagreed. On this sweep that is **2 of 40**, and both are the same trap: the deliberately
 ambiguous "Priya Sharma" address change, where two customers share the name and the ticket
 carries nothing to tell them apart. The controller picked one, the write landed, and the
 post-condition ("is the address now the requested one?") passed, because it checks that the
@@ -334,6 +476,13 @@ action happened and not that the fleet resolved the right identity. That is a re
 post-condition verification, reported rather than dropped: identity resolution needs a check of
 its own, and that is roadmap. The previous sweep reported 0 blind spots, which over five
 completed runs is not evidence of a verifier without blind spots.
+
+Grading your own success signal is rarer than it should be. The Agentic Benchmark Checklist
+([2507.02825](https://arxiv.org/abs/2507.02825)) audited ten widely used agent benchmarks and
+found outcome-validity problems in seven of them, meaning the benchmark's own notion of success
+could be satisfied without the task being done. A verifier with a published error rate of 2 in
+40 is a weaker claim than a verifier with no errors, and a much stronger one than a verifier
+nobody checked.
 
 #### Calibration is now good, and that changes an earlier claim
 
@@ -352,6 +501,42 @@ before it is scored against `verified`. A confident "failed" claim that verifies
 well calibrated, and the old code counted it as the opposite. Corrected and measured over 40
 runs, calibration is good, and any statement that these agents are badly calibrated is out of
 date.
+
+## Three things this build does not have
+
+Scoped out deliberately, each with a named migration path. Stating them here is cheaper than
+having a reviewer find them.
+
+**Durable execution.** `POST /tickets` hands the ticket to FastAPI `BackgroundTasks`, and
+`fleet.run_ticket` drives the loop inside that process, with a fresh `InMemorySessionService`
+per agent turn. If the Cloud Run instance restarts mid-ticket, the in-flight loop is gone and
+nothing resumes it. What *is* true is that nothing is lost quietly: the plan, every tool call
+with its arguments and result, every policy decision and every verification are written to
+Firestore as they happen, and the run document is rewritten after each task, so an interrupted
+ticket is visible in the evidence trail at the exact step it stopped rather than disappearing.
+The approve-and-rerun path (`POST /approvals/{id}/{decision}/rerun`) is the manual resume, and
+the idempotency guard in `policy.before_tool` is what makes rerunning safe. The migration target
+is ADK's workflow graph (`google.adk.workflow`, shipped in the 2.x line), whose nodes interrupt
+and resume from persisted events: a durable pause for human input is exactly the shape of the
+approval gate this fleet already has, bolted to a runtime that survives a restart.
+
+**Per-agent identity.** Marked `partial` in the primitives table above, and it stays partial.
+The agents have typed identities, disjoint tool scopes and published registry cards, but the
+process holds one service account, so the boundary between `billing_agent` and `account_agent`
+is enforced by which tool list each `LlmAgent` was constructed with, not by IAM. The fix is
+known and unglamorous: one service account per agent, workload identity attested (SPIFFE), and
+each agent's write scope expressed as an IAM binding, so a confused or compromised agent is
+refused by the platform rather than by its own tool list and its own instruction.
+
+**End-state verification only.** The post-conditions in `verifier.py` check that the world is
+right when the task finishes. They do not check that the route there was legitimate. Recent work
+calls the gap "corrupt success": Cao, Driouich and Thomas
+([arXiv 2603.03116](https://arxiv.org/abs/2603.03116)) find that **27 to 78%** of τ-bench
+successes which earned a passing reward were concealing a procedural violation, the range
+running across models and domains. The two blind spots reported above are the
+same species. The address write landed, the post-condition passed, and nothing checked it was the
+right Priya. So read the silent-failure rate as what it is, a measurement over end states, and
+read process conformance as unmeasured here rather than as passing.
 
 ## Deploy
 
@@ -394,7 +579,7 @@ backend and the model ids the running revision actually resolved.
 | 4 Tool calling | `tools.py` (FunctionTools over Firestore) |
 | 5 Result verification | `verifier.py` — post-conditions on the system of record |
 | 6 Evidence capture | `policy.after_tool` + `fleet._log` → `events`, `runs` |
-| 7 Approval / rollback | `policy.before_tool` — **deterministic pre-execution gate** (block state-inconsistent writes), kill switch, approval gate; `/approvals/{id}/approve/rerun` |
+| 7 Approval / containment | `policy.before_tool` — **deterministic pre-execution gate** (block state-inconsistent writes), kill switch, approval gate; `/approvals/{id}/approve/rerun` |
 | 8 Experience capture | `experience.py` → `playbook` → worker instruction |
 
 ## Agent registry and identities
@@ -422,6 +607,9 @@ never need cloud access. See `registry.py` and the `agents.py` docstring.
 | High-risk action (refund > limit, deletion) | policy gate before the tool runs | approval doc, worker reports `blocked`, operator approves + reruns |
 | Worker claims `done` on a `pending_approval` result | verifier | silent failure recorded, lesson captured |
 | Transient tool error (`IAM_TIMEOUT`) | tool result | worker reports `failed`; retry on rerun |
+| Worker loops on tool calls (reads included) | tool-call budget in `policy.before_tool` (12 per task) | call blocked, `loop_guard` event, worker told to report `failed` |
+| Worker stalls without raising | 90s `asyncio.wait_for` per model turn in `fleet.run_agent` | turn cancelled, treated as a normal exception, retried down the model chain |
+| Retry re-runs a mutation that already committed | argument fingerprint match in `policy.before_tool` | recorded result replayed, `idempotent_replay` event, no second write |
 | Model rate limit / malformed output | `run_agent` retries, schema validation | run `failed` with error, evidence retained |
 | Operator loses trust | kill switch | all mutating tools blocked fleet-wide |
 

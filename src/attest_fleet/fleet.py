@@ -1,7 +1,7 @@
 """The orchestrator: one ticket through the full eight-step loop.
 
 1 trigger → 2 decomposition (controller) → 3 context passing → 4 tool calls (workers)
-→ 5 verification (post-conditions) → 6 evidence (Firestore) → 7 approval/rollback
+→ 5 verification (post-conditions) → 6 evidence (Firestore) → 7 approval/containment
 (policy gate) → 8 experience capture (playbook).
 
 Deliberately explicit Python rather than free-form agent transfer: the loop is the

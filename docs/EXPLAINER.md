@@ -134,7 +134,7 @@ dropped tickets.
 |---|---|---|
 | Agents reported success | 0.525 | the self-reported scoreboard |
 | Actually succeeded | 0.500 | what the records showed |
-| **Silent-failure rate** | **0.048** | 1 of 21 "done" claims was false |
+| **Silent-failure rate** | **0.048** | 1 of 21 "done" claims. 95% CI [0.008, 0.227] |
 | False alarms | 0.00 | nothing cried failure that was actually fine |
 | Brier / ECE | 0.023 / 0.033 | claim confidence is well calibrated here |
 | Verifier's own blind spots | 2 of 40 | the harness scores the verifier too |
@@ -143,13 +143,15 @@ dropped tickets.
 came from four claimed-done tasks on `gemini-3.5-flash-lite`. We did not delete it — both
 sweeps sit side by side in the README. The finding is:
 
-> The silent-failure rate is a property of the model, not a constant. It fell roughly
-> fivefold when the model tier changed, and it did not reach zero. You cannot know your own
-> rate without measuring it, and last quarter's number is not today's.
+> The silent-failure rate is a property of the model, not a constant. The point estimate fell
+> roughly fivefold when the model tier changed, and did not reach zero. You cannot know your
+> own rate without measuring it, and last quarter's number is not today's.
 
-Two caveats we state rather than bury: 21 claimed-done tasks is a small denominator, and the
-two sweeps differ in fault rate as well as model, so it is a comparison of two operating
-points and not a controlled ablation.
+Three caveats we state rather than bury. 21 claimed-done tasks is a small denominator: the
+Wilson 95% interval on 1 of 21 is [0.008, 0.227], and on the earlier 1 of 4 it is
+[0.046, 0.699]. Those intervals overlap, so the fivefold drop is a comparison of two
+operating points, not a measured effect. And the two sweeps differ in fault rate as well as
+model, so it is not a controlled ablation either.
 
 **The 11 `failed` runs are the system working.** With 30% of mutating calls faulted, many
 tasks genuinely cannot complete. In all 11 the worker reported `failed` and the verifier
