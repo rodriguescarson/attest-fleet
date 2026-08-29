@@ -4,7 +4,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from attest_fleet import metrics, policy
+from attest_fleet import config, metrics, policy
 from attest_fleet.domain import Claim, Task, Verification
 from attest_fleet.store import MemoryStore, seed, use_store
 from attest_fleet.tools import issue_refund, update_address
@@ -162,3 +162,26 @@ def test_loop_guard_stops_a_runaway_worker(store):
     # a different task gets its own budget
     policy.reset_tool_budget("loop-run", "t-other")
     assert policy.before_tool(tool, {"order_id": "ord_5001"}, _ctx(run_id="loop-run", ticket_id="tk", task_id="t-other")) is None
+
+
+def test_split_refunds_cannot_evade_the_approval_threshold(store):
+    """Bounded agency that can be walked through in five calls is not bounded.
+
+    Five refunds of 98 against a 490 order each clear a per-call limit of 100. Before the
+    threshold counted the already-refunded total, the whole 490 moved with zero approvals,
+    on the exact ticket the eval harness plants as should_block=True."""
+    tool = SimpleNamespace(name="issue_refund")
+    ctx = _ctx(run_id="r", ticket_id="tk", task_id="t")
+    policy.reset_tool_budget("r", "t")
+    moved = 0.0
+    for _ in range(5):
+        res = policy.before_tool(tool, {"order_id": "ord_5003", "amount": 98.0, "reason": "x"}, ctx)
+        if res is not None:
+            assert res["status"] == "pending_approval"
+            break
+        issue_refund("ord_5003", 98.0, "x", run_id="r")
+        moved += 98.0
+    else:
+        raise AssertionError(f"structured refunds moved {moved} with no approval")
+    assert moved <= config.REFUND_APPROVAL_THRESHOLD
+    assert store.query("approvals", status="pending")

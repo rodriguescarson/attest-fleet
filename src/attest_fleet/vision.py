@@ -53,6 +53,20 @@ def _assert_fetchable(url: str) -> None:
             raise ValueError(f"attachment host {host!r} resolves to non-public address {ip}")
 
 
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    """Refuse redirects on attachment fetches.
+
+    _assert_fetchable resolves the host and rejects private addresses, but urlopen then
+    re-resolves and follows redirects without re-checking, so a public host could 302 to
+    169.254.169.254. Refusing redirects closes both that and the DNS-rebinding window."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        raise ValueError(f"attachment redirected to {newurl!r}; refusing to follow")
+
+
+_OPENER = urllib.request.build_opener(_NoRedirect)
+
+
 def _load_image(url: str) -> tuple[bytes, str]:
     if url.startswith("data:"):
         head, b64 = url.split(",", 1)
@@ -60,7 +74,7 @@ def _load_image(url: str) -> tuple[bytes, str]:
         return base64.b64decode(b64), mime
     _assert_fetchable(url)
     req = urllib.request.Request(url, headers={"User-Agent": "attest-fleet/0.1"})
-    with urllib.request.urlopen(req, timeout=15) as r:  # noqa: S310 — validated by _assert_fetchable
+    with _OPENER.open(req, timeout=15) as r:  # noqa: S310 — validated by _assert_fetchable, redirects refused
         data = r.read(MAX_IMAGE_BYTES + 1)
         mime = (r.headers.get("Content-Type") or "image/png").split(";")[0]
     if len(data) > MAX_IMAGE_BYTES:

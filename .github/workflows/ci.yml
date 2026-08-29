@@ -18,5 +18,5 @@ jobs:
         run: uv sync --frozen
       - name: Tests (metrics, verifier, policy gate — no API keys)
         run: uv run pytest -q
-      - name: Typecheck
+      - name: Byte-compile (syntax check)
         run: uv run python -c "import compileall, sys; sys.exit(0 if compileall.compile_dir('src', quiet=1) else 1)"

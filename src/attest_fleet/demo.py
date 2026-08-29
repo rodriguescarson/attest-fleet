@@ -28,7 +28,13 @@ def _run(store: BaseStore, rid, subject, ref, status, task, claim, verif, events
 
 
 def seed_demo(store: BaseStore, force: bool = False) -> None:
-    if store.backend != "memory" and not force:  # never touch a real DB unless explicitly forced (demo project only)
+    """Load the fabricated sample runs. MEMORY STORES ONLY, with no override.
+
+    These runs were never executed by an agent. A deployed board is something a judge or
+    an operator may reasonably read as live results, so fabricated data must not be able
+    to reach one, not even behind a flag. The deployed board is populated from the real
+    eval evidence instead (see web._load_eval_evidence)."""
+    if store.backend != "memory":
         return
     if not force and store.get("runs", "run_demo1"):
         return
