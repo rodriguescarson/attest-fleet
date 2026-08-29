@@ -2,6 +2,7 @@
 <html lang="en" data-theme="dark">
 <head>
 <meta charset="utf-8">
+<meta name="theme-color" content="#0a0e0f" id="themeColor">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Attest Fleet</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230b0f10'/%3E%3Cpath d='M16 5l9 3v6c0 6-4 10-9 13-5-3-9-7-9-13V8z' fill='none' stroke='%2322d3ee' stroke-width='2'/%3E%3Cpath d='M11 16l3.5 3.5L22 12' fill='none' stroke='%2322d3ee' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
@@ -148,7 +149,7 @@ button{font-family:inherit; cursor:pointer}
 .search svg{position:absolute; left:11px; top:50%; transform:translateY(-50%); width:15px; height:15px; color:var(--faint)}
 .search input{width:100%; font:inherit; font-size:13px; color:var(--ink); background:var(--surface); border:1px solid var(--line); border-radius:var(--r-sm); padding:9px 12px 9px 34px; transition:.15s}
 .search input::placeholder{color:var(--faint)}
-.search input:focus{border-color:var(--accent); outline:none; box-shadow:0 0 0 3px var(--accent-dim)}
+.search input:focus-visible{border-color:var(--accent); outline:none; box-shadow:0 0 0 3px var(--accent-dim)}
 .fchips{display:flex; gap:6px; flex-wrap:wrap}
 .fchip{font-family:var(--mono); font-size:11px; letter-spacing:.03em; text-transform:uppercase; color:var(--muted); background:var(--surface); border:1px solid var(--line); padding:6px 10px; border-radius:20px; transition:.15s; display:inline-flex; align-items:center; gap:6px}
 .fchip:hover{color:var(--ink-2); border-color:var(--line-strong)}
@@ -363,6 +364,15 @@ button{font-family:inherit; cursor:pointer}
 #briefBtn[aria-busy="true"]{opacity:.55;pointer-events:none}
 #alarmBtn[aria-pressed="true"]{border-color:var(--crit);color:var(--crit)}
 #alarmBtn[aria-pressed="true"] svg{animation:none}
+/* Every interactive element gets a visible focus ring. An operator console that can only
+   be driven by mouse is unusable to a keyboard or screen-reader user, and this one is meant
+   for the person on shift, not just the person who built it. */
+a:focus-visible, button:focus-visible, [role="tab"]:focus-visible,
+input:focus-visible, select:focus-visible, [tabindex]:focus-visible{
+  outline:2px solid var(--accent); outline-offset:2px; border-radius:6px}
+button, [role="tab"], .iconbtn{touch-action:manipulation; -webkit-tap-highlight-color:transparent}
+/* A drawer that chains its scroll to the page behind it feels broken on touch. */
+.drawer{overscroll-behavior:contain}
 </style>
 </head>
 <body>
@@ -604,7 +614,13 @@ function exampleFor(path){
 const THEME_KEY="attest-theme";
 const sun='<svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="4.2" stroke="currentColor" stroke-width="1.7"/><path d="M12 2.5v2.2M12 19.3v2.2M4.5 4.5l1.6 1.6M17.9 17.9l1.6 1.6M2.5 12h2.2M19.3 12h2.2M4.5 19.5l1.6-1.6M17.9 6.1l1.6-1.6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>';
 const moon='<svg viewBox="0 0 24 24" fill="none"><path d="M20 14.5A8 8 0 019.5 4 7.5 7.5 0 1020 14.5z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>';
-function applyTheme(t){document.documentElement.setAttribute("data-theme",t); $("#themeBtn").innerHTML=t==="dark"?sun:moon;}
+function applyTheme(t){
+  document.documentElement.setAttribute("data-theme",t);
+  $("#themeBtn").innerHTML=t==="dark"?sun:moon;
+  // Keep the browser chrome in step with the page, so the status bar does not sit in the
+  // opposite theme to the board it frames.
+  const tc=$("#themeColor"); if(tc) tc.setAttribute("content", t==="dark"?"#0a0e0f":"#f6f9f8");
+}
 (function(){let t;try{t=localStorage.getItem(THEME_KEY)}catch(e){} if(!t)t=matchMedia("(prefers-color-scheme: light)").matches?"light":"dark"; applyTheme(t);})();
 $("#themeBtn").onclick=()=>{const t=document.documentElement.getAttribute("data-theme")==="dark"?"light":"dark"; applyTheme(t); try{localStorage.setItem(THEME_KEY,t)}catch(e){}};
 
