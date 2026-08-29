@@ -50,11 +50,20 @@ point this demonstrates is that the boundary is enforced server-side — a fleet
 switch and approval gate are world-writable has no governance at all. In a real deployment
 this is Cloud Run IAM and a per-operator identity, not a shared string.
 
-**The credential is tiered by blast radius.** The published token drives what a reviewer needs
-(`/tickets`, kill switch, resume, approvals). Destructive and unmetered operations —
-`/admin/seed`, which wipes and reloads the board — take a separate token that is **not** in this
-repo and has no default in `deploy.sh`; it is generated at deploy time and passed by header,
-because a query-string credential is written verbatim into Cloud Run request logs.
+**The credential is tiered by blast radius.** The published token drives what a reviewer needs:
+`POST /tickets`, the kill switch, resume, and approvals. Three endpoints deliberately sit above
+it, behind a token that is **not** in this repo and has no default in `deploy.sh`:
+
+| Endpoint | Why it is not on the published token |
+|---|---|
+| `POST /fleet/fault` | Sets the injected fault rate. At 1.0 every mutating call fails silently, which would turn the live board red for everyone looking at it. |
+| `POST /tickets/batch` | Enqueues up to 200 tickets, each several model calls. Unmetered spend on someone else's project. |
+| `POST /admin/seed` | Wipes the evidence store and reloads it. |
+
+A published string is not a secret, so it must only open what a reviewer actually needs. Those
+three take `x-attest-admin-token` as a header rather than a query parameter, because a
+query-string credential is written verbatim into Cloud Run request logs, and they are kept out
+of the public OpenAPI so the schema handed to a reviewer matches the credential handed with it.
 
 **Auth fails closed when deployed.** If `ATTEST_OPERATOR_TOKEN` is missing on Cloud Run the
 service refuses to start rather than silently opening the kill switch, and `/health` reports

@@ -99,6 +99,37 @@ def require_operator(request: Request) -> None:
             pass
         raise HTTPException(403, "operator token required for state-changing calls")
 
+ADMIN_TOKEN = os.getenv("ATTEST_ADMIN_TOKEN", "")
+
+
+def require_admin(request: Request) -> None:
+    """Guard the endpoints the published token must NOT reach.
+
+    The operator token is published on purpose so a reviewer can drive the console, which
+    means it is not a secret and must only authorise what a reviewer needs: run a ticket,
+    decide an approval, hit the kill switch. Two endpoints do not belong in that set --
+    fault injection can turn the whole live board red, and the batch trigger is unmetered
+    model spend -- so they sit behind a token that is not in the repo. Tiering the
+    credential by blast radius is the point; one shared string for both would mean the
+    published one carries the worst case.
+    """
+    expected = ADMIN_TOKEN or os.getenv("ATTEST_ADMIN_TOKEN", "")
+    if not expected:
+        return  # unset locally: same posture as the operator token
+    supplied = (request.headers.get("x-attest-admin-token")
+                or request.query_params.get("token") or "")
+    if not secrets.compare_digest(supplied, expected):
+        try:
+            from .policy import record_event
+
+            record_event(run_id="fleet", kind="policy", name="auth_denied",
+                         args_json=json.dumps({"path": request.url.path, "tier": "admin"}),
+                         result_json=json.dumps({"reason": "admin token required"}))
+        except Exception:  # noqa: BLE001
+            pass
+        raise HTTPException(403, "this endpoint requires the admin token, not the published operator token")
+
+
 if config.ADK_UI:
     try:  # the ADK developer UI, mounted for local demos
         import os
@@ -129,7 +160,7 @@ async def create_ticket(request: Request, background: BackgroundTasks) -> dict:
     return {"accepted": True, "ticket_id": ticket.id}
 
 
-@app.post("/tickets/batch", status_code=202, dependencies=[Depends(require_operator)])
+@app.post("/tickets/batch", status_code=202, include_in_schema=False, dependencies=[Depends(require_admin)])
 async def create_tickets_batch(request: Request, background: BackgroundTasks) -> dict:
     """Async batch trigger: enqueue many tickets at once; they process in the
     background and stream onto the dashboard. Accepts {"tickets": [...]} or a bare list."""
@@ -341,7 +372,7 @@ def _load_eval_evidence(store) -> int:
     return n
 
 
-@app.post("/fleet/fault", dependencies=[Depends(require_operator)])
+@app.post("/fleet/fault", include_in_schema=False, dependencies=[Depends(require_admin)])
 def set_fault_rate(rate: float) -> dict:
     """Fault injection, as an operator control.
 

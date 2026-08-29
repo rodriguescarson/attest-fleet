@@ -62,3 +62,35 @@ def test_denial_is_written_to_the_evidence_trail(client):
 def test_a_wrong_token_is_still_rejected(client):
     c, _ = client
     assert c.post("/fleet/kill", headers={"X-Attest-Token": "nope"}).status_code == 403
+
+
+def test_the_published_token_cannot_reach_the_dangerous_endpoints(monkeypatch):
+    """The operator token is published so a reviewer can drive the console, which means it
+    is not a secret. Fault injection can turn the whole live board red and the batch
+    trigger is unmetered model spend, so neither belongs in what a published string opens."""
+    monkeypatch.setenv("ATTEST_OPERATOR_TOKEN", TOKEN)
+    monkeypatch.setenv("ATTEST_ADMIN_TOKEN", "admin-secret")
+    import attest_fleet.web as web
+    importlib.reload(web)
+    s = MemoryStore(); seed(s); use_store(s)
+    with TestClient(web.app) as c:
+        assert c.post("/fleet/fault", params={"rate": 1.0, "token": TOKEN}).status_code == 403
+        assert c.post("/tickets/batch", json={"tickets": []},
+                      headers={"X-Attest-Token": TOKEN}).status_code == 403
+        # the admin token does open them
+        assert c.post("/fleet/fault", params={"rate": 0},
+                      headers={"x-attest-admin-token": "admin-secret"}).status_code == 200
+        # and the published token still drives what a reviewer needs
+        assert c.post("/fleet/kill", headers={"X-Attest-Token": TOKEN}).status_code == 200
+
+
+def test_dangerous_endpoints_are_not_advertised(monkeypatch):
+    """They are not secret by obscurity, but they should not be in the public schema a
+    reviewer is handed alongside a published credential."""
+    monkeypatch.setenv("ATTEST_OPERATOR_TOKEN", TOKEN)
+    import attest_fleet.web as web
+    importlib.reload(web)
+    with TestClient(web.app) as c:
+        paths = c.get("/openapi.json").json()["paths"]
+        assert "/fleet/fault" not in paths and "/tickets/batch" not in paths
+        assert "/tickets" in paths  # what a reviewer does need stays documented
