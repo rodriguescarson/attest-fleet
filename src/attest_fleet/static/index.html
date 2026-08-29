@@ -89,6 +89,14 @@ button{font-family:inherit; cursor:pointer}
 /* ---------- hero ---------- */
 .hero{position:relative; margin-top:22px; border:1px solid var(--line); border-radius:14px; background:var(--surface); overflow:hidden; box-shadow:var(--shadow)}
 .hero::before{content:""; position:absolute; inset:0; background:radial-gradient(120% 140% at 88% -10%, color-mix(in srgb,var(--crit) 22%,transparent), transparent 55%); pointer-events:none; opacity:.9}
+/* Screen blend lifts colour off a dark ground; on a light ground it does nothing, so the
+   light theme multiplies instead. Same shader, opposite arithmetic. */
+.hero-shader{position:absolute; inset:0; pointer-events:none; opacity:.34; mix-blend-mode:screen;
+  transition:opacity .6s ease; contain:strict}
+[data-theme="light"] .hero-shader{opacity:.30; mix-blend-mode:multiply}
+@media (prefers-color-scheme: light){
+  :root:not([data-theme="dark"]) .hero-shader{opacity:.30; mix-blend-mode:multiply}
+}
 .hero-in{position:relative; display:grid; grid-template-columns:minmax(0,300px) 1fr; gap:8px}
 .hero-left{padding:26px 26px 24px; border-right:1px solid var(--line)}
 .hero-eyebrow{font-family:var(--mono); font-size:11px; letter-spacing:.13em; text-transform:uppercase; color:var(--muted)}
@@ -381,6 +389,7 @@ button{font-family:inherit; cursor:pointer}
 
   <!-- HERO -->
   <section class="hero" aria-label="Verification summary">
+    <div class="hero-shader" id="heroShader" aria-hidden="true"></div>
     <div class="hero-in">
       <div class="hero-left">
         <div class="hero-eyebrow" data-tip="sf" tabindex="0">Silent failure rate</div>
@@ -819,6 +828,37 @@ async function tick(){ await loadMetrics(); if(state.tab==="overview")loadOvervi
   if(!m || !m.runs){ setExample(true); toast("No live runs yet \u2014 showing example data"); return; }
   await loadMetrics(); loadOverview();
   setInterval(()=>{ if(!drawerOpen && !exampleMode) tick(); }, 5000);
+})();
+</script>
+
+<script type="module">
+/* Ambient mesh gradient behind the hero only. The data surfaces are left alone: a control
+   room is scanned, not admired, and legibility beats atmosphere everywhere a number lives.
+   Entirely optional -- if WebGL, the CDN or the module fails, the CSS glow underneath is
+   the design, and nothing above it changes. */
+(async () => {
+  const host = document.getElementById("heroShader");
+  if (!host) return;
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  try {
+    const { ShaderMount, meshGradientFragmentShader } =
+      await import("https://cdn.jsdelivr.net/npm/@paper-design/shaders@0.0.80/+esm");
+    const dark = !matchMedia("(prefers-color-scheme: light)").matches
+      || document.documentElement.dataset.theme === "dark";
+    // Drawn from the console's own palette: signal cyan, verified green, the crimson the
+    // hero already glows with, over the near-black blue-green ground.
+    const colors = dark
+      ? [[0.13,0.83,0.93,1],[0.20,0.83,0.60,1],[0.98,0.45,0.52,1],[0.03,0.05,0.06,1]]
+      : [[0.05,0.45,0.56,1],[0.06,0.48,0.33,1],[0.70,0.20,0.29,1],[1,1,1,1]];
+    new ShaderMount(host, meshGradientFragmentShader, {
+      u_colors: colors, u_colorsCount: colors.length,
+      u_distortion: 0.72, u_swirl: 0.58, u_grainMixer: 0.22, u_grainOverlay: 0.05,
+      u_scale: 1.35, u_rotation: 0, u_offsetX: 0.12, u_offsetY: -0.1,
+      u_originX: 0.5, u_originY: 0.5, u_worldWidth: 0, u_worldHeight: 0, u_fit: 2,
+    }, { antialias: true }, reduce ? 0 : 0.14, 0, 1);
+  } catch (e) {
+    host.remove();  // the CSS glow underneath is the fallback
+  }
 })();
 </script>
 </body>
