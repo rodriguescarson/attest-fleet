@@ -138,6 +138,13 @@ class Event(BaseModel):
     result_json: str = ""
     latency_ms: Optional[int] = None
     ts: str = Field(default_factory=now_iso)
+    # Chain links, set by chain.link() at write time. See chain.py for what they do and,
+    # more importantly, what they do not guarantee.
+    prev_hash: Optional[str] = None
+    hash: Optional[str] = None
+    # Position within this run's chain. Timestamps collide when several events are written
+    # in the same millisecond, so order is explicit rather than inferred from `ts`.
+    seq: Optional[int] = None
 
 
 class TaskResult(BaseModel):

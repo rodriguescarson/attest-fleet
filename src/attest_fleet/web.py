@@ -208,11 +208,15 @@ def run_evidence(run_id: str) -> Response:
         raise HTTPException(404)
     events = sorted(store.query("events", run_id=run_id), key=lambda e: e.get("ts", ""))
     approvals = [a for a in store.list("approvals", limit=500) if a.get("run_id") == run_id]
+    from .chain import verify_chain
     from .contracts import all_contracts
 
     package = {
         "run": r,
         "events": events,
+        # The trail attests to itself: recomputed at download time, so this package proves
+        # the chain was intact when it was generated.
+        "audit_chain": verify_chain(events),
         "approvals": approvals,
         "agent_contracts": all_contracts(),
         "verification_method": "post-conditions read from the system of record; "

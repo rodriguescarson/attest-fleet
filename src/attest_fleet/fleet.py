@@ -43,9 +43,12 @@ def _agent(name: str, model: Optional[str] = None):
 
 
 def _log(run_id: str, kind: str, name: str, task_id: Optional[str] = None, agent: Optional[str] = None, latency_ms: Optional[int] = None, **payload: Any) -> None:
+    from .chain import link
+
     ev = Event(run_id=run_id, task_id=task_id, agent=agent, kind=kind, name=name, latency_ms=latency_ms,
                args_json=json.dumps(payload, default=str)[:4000])
-    get_store().set("events", ev.id, ev.model_dump())
+    store = get_store()
+    store.set("events", ev.id, link(store, ev.model_dump()))
 
 
 def _extract_json(text: str) -> str:

@@ -83,8 +83,12 @@ def args_fingerprint(tool_name: str, args: dict[str, Any]) -> str:
 
 
 def record_event(**kw: Any) -> Event:
+    """Write one row of evidence, linked to the row before it in the same run."""
+    from .chain import link
+
     ev = Event(**kw)
-    get_store().set("events", ev.id, ev.model_dump())
+    store = get_store()
+    store.set("events", ev.id, link(store, ev.model_dump()))
     return ev
 
 
