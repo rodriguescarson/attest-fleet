@@ -50,6 +50,22 @@ point this demonstrates is that the boundary is enforced server-side — a fleet
 switch and approval gate are world-writable has no governance at all. In a real deployment
 this is Cloud Run IAM and a per-operator identity, not a shared string.
 
+**The credential is tiered by blast radius.** The published token drives what a reviewer needs
+(`/tickets`, kill switch, resume, approvals). Destructive and unmetered operations —
+`/admin/seed`, which wipes and reloads the board — take a separate token that is **not** in this
+repo and has no default in `deploy.sh`; it is generated at deploy time and passed by header,
+because a query-string credential is written verbatim into Cloud Run request logs.
+
+**Auth fails closed when deployed.** If `ATTEST_OPERATOR_TOKEN` is missing on Cloud Run the
+service refuses to start rather than silently opening the kill switch, and `/health` reports
+`"auth": "enforced"` so the state is visible rather than assumed.
+
+**Least privilege.** The service runs as a dedicated runtime service account
+(`attest-fleet-run@…`) holding five scoped roles, plus `secretAccessor` on the one secret it
+needs. It deliberately does **not** use the default compute service account, which carries
+`roles/editor`: a publicly reachable service that executes attacker-influenced ticket text
+should not hold project editor over a project containing anything else.
+
 ![Attest Fleet architecture: trigger, fleet controller, workers, policy gate, verifier, evidence, metrics and experience capture](docs/img/architecture.jpg)
 
 Every agent framework reports success from the agent's own self-report. When a worker

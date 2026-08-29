@@ -48,7 +48,13 @@ def _state_gate(tool_name: str, args: dict[str, Any], store) -> Optional[str]:
     return None
 
 
-def _is_high_risk(tool_name: str, args: dict[str, Any]) -> Optional[str]:
+def _is_high_risk(tool_name: str, args: dict[str, Any], store=None) -> Optional[str]:
+    """Is this action high-risk enough to need a human?
+
+    The threshold is CUMULATIVE per order, not per call. A per-call limit is trivially
+    structured around: five refunds of 98 against a 490 order each clear a 100 limit, no
+    approval is ever raised, and the whole 490 moves. Bounded agency that can be walked
+    through in five calls is not bounded, so the already-refunded total counts toward it."""
     if tool_name == "delete_account":
         return "account deletion is irreversible"
     if tool_name == "issue_refund":
@@ -56,7 +62,17 @@ def _is_high_risk(tool_name: str, args: dict[str, Any]) -> Optional[str]:
             amount = float(args.get("amount", 0))
         except (TypeError, ValueError):
             amount = 0.0
-        if amount > config.REFUND_APPROVAL_THRESHOLD:
+        already = 0.0
+        order_id = args.get("order_id", "")
+        if store is not None and order_id:
+            order = store.get("orders", order_id)
+            if order:
+                already = float(order.get("refunded", 0) or 0)
+        total = amount + already
+        if total > config.REFUND_APPROVAL_THRESHOLD:
+            if already:
+                return (f"refund {amount:.2f} takes this order to {total:.2f} refunded, over the "
+                        f"{config.REFUND_APPROVAL_THRESHOLD:.0f} auto-approval limit")
             return f"refund {amount:.2f} exceeds the {config.REFUND_APPROVAL_THRESHOLD:.0f} auto-approval limit"
     return None
 
@@ -123,7 +139,7 @@ def before_tool(tool, args: dict[str, Any], tool_context) -> Optional[dict]:
             return {"status": "blocked", "reason": gate,
                     "instruction": "This action is inconsistent with the current system state and was blocked before it ran. Report outcome='failed' and quote this reason. Do not claim the task is done."}
 
-    reason = _is_high_risk(tool.name, args)
+    reason = _is_high_risk(tool.name, args, store)
     if reason:
         fp = args_fingerprint(tool.name, args)
         approved = [a for a in store.query("approvals", ticket_id=ticket_id, action=tool.name, status="approved")

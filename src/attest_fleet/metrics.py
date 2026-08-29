@@ -99,6 +99,20 @@ def compute_records(records: Iterable[dict], target_risk: float = 0.02) -> dict:
     return _report(samples, target_risk)
 
 
+def pairs_from_runs(runs: Iterable[dict]) -> list[tuple[Claim, Verification]]:
+    """Reshape stored run records into (claim, verification) pairs.
+
+    Lives here rather than in the HTTP layer so the eval harness does not have to import
+    the web module (and with it FastAPI, tracing setup and the ADK UI mount) just to do
+    arithmetic."""
+    out = []
+    for r in runs:
+        for tr in r.get("results", []):
+            if tr.get("claim") and tr.get("verification"):
+                out.append((Claim.model_validate(tr["claim"]), Verification.model_validate(tr["verification"])))
+    return out
+
+
 def compute(pairs: Iterable[tuple[Claim, Verification]], target_risk: float = 0.02) -> dict:
     return _report(to_samples(pairs), target_risk)
 

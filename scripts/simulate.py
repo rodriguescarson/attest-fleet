@@ -21,7 +21,7 @@ from attest_fleet import config, metrics  # noqa: E402
 from attest_fleet.domain import Expectation, Ticket  # noqa: E402
 from attest_fleet.fleet import run_ticket  # noqa: E402
 from attest_fleet.store import MemoryStore, get_store, reset_evidence, seed, use_store  # noqa: E402
-from attest_fleet.web import _pairs  # noqa: E402
+from attest_fleet.metrics import pairs_from_runs as _pairs  # noqa: E402
 
 TEMPLATES = [
     # (customer_ref, subject, body, expectation)

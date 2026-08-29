@@ -63,6 +63,12 @@ app = FastAPI(title="Attest Fleet", version="0.1.0", lifespan=lifespan)
 
 OPERATOR_TOKEN = os.getenv("ATTEST_OPERATOR_TOKEN", "")
 
+# Fail closed when deployed. An unset token silently opens the kill switch, the approval
+# gate and the ticket trigger to anyone; a governance boundary must not be able to vanish
+# because an env var was dropped on a redeploy. K_SERVICE is set by Cloud Run.
+if os.getenv("K_SERVICE") and not OPERATOR_TOKEN:
+    raise RuntimeError("ATTEST_OPERATOR_TOKEN must be set when deployed")
+
 
 def require_operator(request: Request) -> None:
     """Guard every state-changing endpoint.
@@ -146,19 +152,13 @@ async def audit(request: Request) -> dict:
     any agent stack (point OpenTelemetry GenAI spans or your own logs at it)."""
     payload = await request.json()
     records = payload.get("records", payload) if isinstance(payload, dict) else payload
-    return metrics.compute_records(records or [], config.TARGET_RESIDUAL_RISK)
+    return metrics.compute_records((records or [])[:50_000], config.TARGET_RESIDUAL_RISK)
 
 
 # ------------------------------------------------------------------ evidence API
 
 
-def _pairs(runs: list[dict]) -> list[tuple[Claim, Verification]]:
-    out = []
-    for r in runs:
-        for tr in r.get("results", []):
-            if tr.get("claim") and tr.get("verification"):
-                out.append((Claim.model_validate(tr["claim"]), Verification.model_validate(tr["verification"])))
-    return out
+from .metrics import pairs_from_runs as _pairs  # noqa: E402  (kept as _pairs for callers)
 
 
 @app.get("/runs")
@@ -180,7 +180,10 @@ def list_runs(q: str = "", status: str = "", sort: str = "started", order: str =
     total = len(runs)
     limit = max(1, min(limit, 100))
     return {"items": runs[offset:offset + limit], "total": total, "limit": limit, "offset": offset,
-            "counts": {s: sum(1 for r in get_store().list("runs", limit=10_000) if r.get("status") == s) for s in ("verified", "silent_failure", "pending_approval", "failed", "killed", "running")}}
+            # Count from the list already in hand. This previously re-scanned the whole
+            # collection once per status - seven full Firestore scans per request, on a
+            # dashboard that polls every five seconds.
+            "counts": {s: sum(1 for r in runs if r.get("status") == s) for s in ("verified", "silent_failure", "pending_approval", "failed", "killed", "running")}}
 
 
 @app.get("/runs/{run_id}")
@@ -263,10 +266,13 @@ def resume() -> dict:
 
 
 @app.post("/admin/seed", include_in_schema=False)
-def admin_seed(token: str = "") -> dict:
+def admin_seed(request: Request, token: str = "") -> dict:
     """Reset the board to the curated demo runs. Token-guarded; demo project only."""
     expected = os.getenv("ATTEST_ADMIN_TOKEN")
-    if not expected or token != expected:
+    # Header first: a query-string credential is written verbatim into Cloud Run request
+    # logs. The operator token is published so that costs nothing, but this one is not.
+    supplied = request.headers.get("x-attest-admin-token") or token
+    if not expected or not secrets.compare_digest(supplied, expected):
         raise HTTPException(403, "forbidden")
     from .store import reset_evidence
     store = get_store()
@@ -341,6 +347,10 @@ def playbook() -> list[dict]:
 def healthz() -> dict:
     store = get_store()
     return {"ok": True, "store": store.backend, "kill_switch": bool(store.get_setting("kill_switch", False)),
+            # Surfacing the auth state turns a silent failure mode into a visible control:
+            # if the operator token were ever dropped, this says so instead of hiding it.
+            "auth": "enforced" if OPERATOR_TOKEN else "open (local dev)",
+            "fault_rate": float(store.get_setting("fault_rate", 0) or 0),
             "models": {"controller": config.CONTROLLER_MODEL, "worker": config.WORKER_MODEL}}
 
 

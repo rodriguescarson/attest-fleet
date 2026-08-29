@@ -1,2 +1,1 @@
-def main() -> None:
-    print("Hello from attest-fleet!")
+"""Attest Fleet: a governed agent fleet whose every claim is independently verified."""
