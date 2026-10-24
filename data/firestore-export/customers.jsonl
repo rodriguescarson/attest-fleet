@@ -1,0 +1,6 @@
+{"_id": "cus_1001", "_path": "customers/cus_1001", "address": "14 Lake View Rd, Pune 411001", "locked": false, "email": "priya.sharma@example.com", "plan": "pro", "id": "cus_1001", "name": "Priya Sharma"}
+{"_id": "cus_1002", "_path": "customers/cus_1002", "address": "77 MG Road, Bengaluru 560001", "locked": true, "email": "priya.s@example.org", "plan": "starter", "id": "cus_1002", "name": "Priya Sharma"}
+{"_id": "cus_1003", "_path": "customers/cus_1003", "address": "5 Marina Way, Lagos", "locked": false, "email": "d.okafor@example.com", "plan": "pro", "id": "cus_1003", "name": "Daniel Okafor"}
+{"_id": "cus_1004", "_path": "customers/cus_1004", "address": "88 Nanjing Rd, Shanghai 200001", "locked": false, "email": "meiling@example.com", "plan": "team", "id": "cus_1004", "name": "Mei-Ling Chen"}
+{"_id": "cus_1005", "_path": "customers/cus_1005", "address": "Rua Augusta 12, Lisboa 1100-048", "locked": true, "email": "carlos@example.pt", "plan": "starter", "id": "cus_1005", "name": "Carlos Duarte"}
+{"_id": "cus_1006", "_path": "customers/cus_1006", "address": "Flat 3B, Park St, Kolkata 700016", "locked": false, "email": "aisha.r@example.com", "plan": "pro", "id": "cus_1006", "name": "Aisha Rahman"}

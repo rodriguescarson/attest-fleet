@@ -5,40 +5,50 @@
 **A governed agent fleet whose every claim is independently verified.**
 Built for the All Things Agentic Hackathon (Google) — Fortified Enterprise Fleet.
 
-## Live on Google Cloud Run
+## Where it lives now
 
-### https://attest-fleet-434066362046.asia-south1.run.app
+### https://attest-fleet.rodriguescarson.workers.dev
 
-Deployed from this repo with `deploy.sh` (Cloud Run, `asia-south1`, Firestore database
-`attest-fleet`, Gemini on Vertex AI, and the Gemma auditor's Developer API key in Secret
-Manager). Nothing to install to look at it:
+**Retired from Google Cloud on 25 Oct 2026.** The hackathon closed without a prize for this
+entry (the Fortified Enterprise Fleet track went to EIR: Healthcare Agent Fleet), so the Cloud
+Run service, the `attest-fleet` Firestore database, the Secret Manager key, the container images,
+the Agent Registry cards, the Model Armor template and the service account were all deleted;
+nothing bills. What judges saw is preserved as a static snapshot of the final run: the operator
+console with every run, verdict and evidence check, the metrics, the agent cards and the spoken
+briefing, served from Cloudflare. The kill switch, approvals and ticket trigger no longer act.
 
 | Surface | URL |
 |---|---|
-| Operator dashboard | [`/`](https://attest-fleet-434066362046.asia-south1.run.app/) |
-| Metrics (reported vs verified, Brier/ECE, escalation) | [`/metrics`](https://attest-fleet-434066362046.asia-south1.run.app/metrics) |
-| Run evidence | [`/runs`](https://attest-fleet-434066362046.asia-south1.run.app/runs) |
-| Agent Registry view (live agent cards) | [`/fleet/identities`](https://attest-fleet-434066362046.asia-south1.run.app/fleet/identities) |
-| Health + live model config | [`/health`](https://attest-fleet-434066362046.asia-south1.run.app/health) |
-| OpenAPI | [`/docs`](https://attest-fleet-434066362046.asia-south1.run.app/docs) |
+| Operator dashboard (snapshot) | [`/`](https://attest-fleet.rodriguescarson.workers.dev/) |
+| Metrics (reported vs verified, Brier/ECE, escalation) | [`/api/metrics.json`](https://attest-fleet.rodriguescarson.workers.dev/api/metrics.json) |
+| All 40 runs | [`/api/runs.json`](https://attest-fleet.rodriguescarson.workers.dev/api/runs.json) |
+| One run + its evidence | [`/api/runs/run_1e6b0d4e20.json`](https://attest-fleet.rodriguescarson.workers.dev/api/runs/run_1e6b0d4e20.json) · [`.evidence.json`](https://attest-fleet.rodriguescarson.workers.dev/api/runs/run_1e6b0d4e20.evidence.json) |
+| Agent Registry view (cards as they were served) | [`/api/fleet/identities.json`](https://attest-fleet.rodriguescarson.workers.dev/api/fleet/identities.json) |
+| OpenAPI of the retired service | [`/docs`](https://attest-fleet.rodriguescarson.workers.dev/docs/) |
+
+The raw material is in the repo: `data/api-snapshot/` (every read endpoint, captured before
+deletion) and `data/firestore-export/` (all six collections of the `attest-fleet` database as
+JSONL: 40 runs, 6 customers, 7 orders, 6 subscriptions, settings, events). `scripts/build_site.py`
+rebuilds `site/` from the snapshot (or `--fetch URL` from a running app) and `npx wrangler deploy`
+publishes it. To run the real fleet, follow "Run locally" below.
 
 The dashboard's **Example data** toggle (top right) fills the board with sample runs, so the
 interface is explorable even when the live service has processed nothing recently.
 
-Every read above is open, so the whole evidence trail is auditable without a credential.
-State-changing calls on the hosted service (`POST /tickets`, the kill switch, approvals) are
+When the service was live, every read was open, so the whole evidence trail was auditable
+without a credential. State-changing calls on the hosted service (`POST /tickets`, the kill switch, approvals) are
 behind an operator token, sent as an `x-attest-token` header or a `?token=` parameter; the
 hosted dashboard supplies it for you. Locally the token is unset and nothing is gated.
 
-**Testing credential for judges.** The demo token is published on purpose, so the project is
-testable without restriction:
+**Testing credential for judges (historical).** The demo token was published on purpose, so the
+project was testable without restriction; it died with the service:
 
 ```
 attest-operator-cc3545eb9ca5
 ```
 
 ```bash
-URL=https://attest-fleet-434066362046.asia-south1.run.app
+URL=http://localhost:8080   # the hosted service is retired
 curl -X POST "$URL/fleet/kill"                                    # 403, no token
 curl -X POST "$URL/fleet/kill?token=attest-operator-cc3545eb9ca5" # 200, kill switch engaged
 curl -X POST "$URL/fleet/resume?token=attest-operator-cc3545eb9ca5"
@@ -573,9 +583,8 @@ Each of those integrations degrades on its own rather than taking the fleet down
 means `/fleet/identities` answers `"source": "local"`, no Model Armor means the guard fails
 open, no Cloud Trace means the spans stay local.
 
-This is the script that produced the live service at
-**https://attest-fleet-434066362046.asia-south1.run.app** (region `asia-south1`, Firestore
-database `attest-fleet`, `ATTEST_STORE=firestore`). `curl <URL>/health` returns the store
+This is the script that produced the live service that ran from 25 Aug to 25 Oct 2026 (region
+`asia-south1`, Firestore database `attest-fleet`, `ATTEST_STORE=firestore`), since deleted. `curl <URL>/health` returns the store
 backend and the model ids the running revision actually resolved.
 
 ## The eight-step loop, mapped to code

@@ -3,7 +3,7 @@
 A plain-language walkthrough of the deployed system, written so a reader who has never seen
 the code can follow it, and so a reviewer can find the places where we made a judgement call.
 
-Live: **https://attest-fleet-434066362046.asia-south1.run.app**
+Live (static snapshot of the final run; the Cloud Run service was retired on 25 Oct 2026): **https://attest-fleet.rodriguescarson.workers.dev**
 
 ---
 
@@ -183,7 +183,7 @@ not manufacture a lie.
 
 | | |
 |---|---|
-| Live app | https://attest-fleet-434066362046.asia-south1.run.app |
+| Live app (static snapshot since 25 Oct 2026) | https://attest-fleet.rodriguescarson.workers.dev |
 | Code | https://github.com/rodriguescarson/attest-fleet |
 | Reload the board from real eval evidence | `POST /admin/seed?token=…` |
 | Operator token | published in the README, so the project is testable without restriction |

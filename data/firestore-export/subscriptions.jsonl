@@ -1,0 +1,6 @@
+{"_id": "sub_9001", "_path": "subscriptions/sub_9001", "customer_id": "cus_1001", "status": "active", "plan": "pro", "id": "sub_9001"}
+{"_id": "sub_9002", "_path": "subscriptions/sub_9002", "customer_id": "cus_1002", "status": "active", "plan": "starter", "id": "sub_9002"}
+{"_id": "sub_9003", "_path": "subscriptions/sub_9003", "customer_id": "cus_1003", "status": "active", "plan": "pro", "id": "sub_9003"}
+{"_id": "sub_9004", "_path": "subscriptions/sub_9004", "customer_id": "cus_1004", "status": "active", "plan": "team", "id": "sub_9004"}
+{"_id": "sub_9005", "_path": "subscriptions/sub_9005", "customer_id": "cus_1005", "status": "cancelled", "plan": "starter", "id": "sub_9005"}
+{"_id": "sub_9006", "_path": "subscriptions/sub_9006", "customer_id": "cus_1006", "status": "active", "plan": "pro", "id": "sub_9006"}

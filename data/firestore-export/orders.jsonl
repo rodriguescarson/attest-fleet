@@ -1,0 +1,7 @@
+{"_id": "ord_5001", "_path": "orders/ord_5001", "refunded": 0.0, "customer_id": "cus_1001", "status": "paid", "total": 49.0, "item": "Pro monthly", "id": "ord_5001"}
+{"_id": "ord_5002", "_path": "orders/ord_5002", "refunded": 0.0, "total": 19.0, "status": "paid", "customer_id": "cus_1002", "item": "Starter monthly", "id": "ord_5002"}
+{"_id": "ord_5003", "_path": "orders/ord_5003", "refunded": 0.0, "total": 490.0, "status": "paid", "customer_id": "cus_1003", "item": "Pro annual", "id": "ord_5003"}
+{"_id": "ord_5004", "_path": "orders/ord_5004", "refunded": 0.0, "customer_id": "cus_1004", "status": "paid", "total": 1490.0, "item": "Team annual", "id": "ord_5004"}
+{"_id": "ord_5005", "_path": "orders/ord_5005", "refunded": 19.0, "total": 19.0, "status": "refunded", "customer_id": "cus_1005", "item": "Starter monthly", "id": "ord_5005"}
+{"_id": "ord_5006", "_path": "orders/ord_5006", "refunded": 0.0, "total": 49.0, "status": "paid", "customer_id": "cus_1006", "item": "Pro monthly", "id": "ord_5006"}
+{"_id": "ord_5007", "_path": "orders/ord_5007", "refunded": 0.0, "total": 120.0, "status": "paid", "customer_id": "cus_1001", "item": "Add-on seats", "id": "ord_5007"}
