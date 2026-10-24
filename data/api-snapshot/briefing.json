@@ -1,0 +1,1 @@
+{"script":"1 silent failure caught since the last reset: an agent reported success that the records do not support. The one to look at is Cancel subscription. Across 40 runs, 20 verified clean, and the silent failure rate is 4.8 percent. That is the whole picture. Everything else is on the board.","worst":{"subject":"Cancel subscription","run_id":"run_a33bd0ae46"}}

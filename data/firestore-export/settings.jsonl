@@ -1,0 +1,2 @@
+{"_id": "fault_rate", "_path": "settings/fault_rate", "value": 0.0, "id": "fault_rate"}
+{"_id": "kill_switch", "_path": "settings/kill_switch", "value": false, "id": "kill_switch"}

@@ -1,0 +1,1 @@
+{"ok":true,"store":"firestore","kill_switch":false,"auth":"enforced","fault_rate":0.0,"models":{"controller":"gemini-3.7-flash","worker":"gemini-3.7-flash"}}

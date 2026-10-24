@@ -1,0 +1,6 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "attest-fleet",
+  "compatibility_date": "2026-10-12",
+  "assets": { "directory": "site" }
+}
